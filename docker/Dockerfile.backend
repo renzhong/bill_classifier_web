@@ -1,0 +1,40 @@
+# syntax=docker/dockerfile:1.6
+
+# ===== base: 装 uv =====
+FROM python:3.11-slim AS base
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        curl ca-certificates build-essential \
+    && rm -rf /var/lib/apt/lists/*
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/root/.local/bin:${PATH}"
+WORKDIR /app
+
+# ===== dev: 仅放工具，源码走 volume =====
+FROM base AS dev
+COPY backend/pyproject.toml backend/uv.lock* ./
+RUN uv sync --frozen || uv sync
+EXPOSE 8000
+
+# ===== builder: 锁依赖 =====
+FROM base AS builder
+COPY backend/pyproject.toml backend/uv.lock* ./
+RUN uv sync --frozen --no-dev || uv sync --no-dev
+
+# ===== runtime: 精简产物 =====
+FROM python:3.11-slim AS runtime
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PATH="/root/.local/bin:/app/.venv/bin:${PATH}"
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && curl -LsSf https://astral.sh/uv/install.sh | sh
+WORKDIR /app
+COPY --from=builder /app/.venv /app/.venv
+COPY backend/pyproject.toml backend/uv.lock* /app/
+COPY backend /app
+EXPOSE 8000
+CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
