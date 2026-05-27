@@ -1,0 +1,32 @@
+# 避免本地虚拟环境/依赖/缓存被打入镜像，确保构建可复现
+**/__pycache__
+**/.venv
+**/venv
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+**/htmlcov
+
+# Node
+frontend/node_modules
+frontend/dist
+frontend/.vite
+
+# Editor / OS
+**/.DS_Store
+**/.idea
+**/.vscode
+
+# Git
+.git
+.gitignore
+
+# Docs / dev-only
+docker/mysql/data
+uploads
+*.log
+
+# 密钥
+.env
+.env.*
+!.env.example
