@@ -116,6 +116,8 @@ users ─┬─< invitation_codes
 
 ## 6. 通用策略引擎
 
+> **现状提醒**：截至当前迭代，代码中**仅实现了 `ai_classify` 一个策略类型**。后续候选类型（精确匹配、子串匹配、合并、扩散等）都没有写在代码里，仅作为未来候选保留在 [docs/strategy-types.md](./docs/strategy-types.md) 末尾。引擎本身（ABC + 注册器 + Pipeline runner）已具备完整扩展性，新增类型只需新增一个文件 + register 一行，前端按 `param_schema` 自动渲染。
+
 **核心抽象**：
 
 ```python

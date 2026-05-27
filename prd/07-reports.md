@@ -19,9 +19,11 @@
 
 ## 实现要点
 - 利用 `bills.bill_month` 生成列做 GROUP BY，避免全表扫
-- `lifecycle != 'skipped'` 才入统计
-- 收入支出口径：`amount * (bill_type==income ? +1 : -1)`，跨月退款单独标识
+- `lifecycle in ('skipped', 'cross_month_refund')` 一律剔除统计
+- 收入支出口径：按 `bill_type` 拆 income / expense / other 三桶
 - 资产合计：拿 `assets` 当月最新快照按 asset_type 汇总
+- `monthly` 端点的"净值变化" = 当月资产合计 − 上月资产合计
+- 前端用 echarts 5 + `components/EChart.vue` 通用封装；按需注册 `BarChart` / `PieChart` / `LineChart` 与必要组件，避免完整包打入 bundle
 
 ## 验收
 - 空账户访问报表页 → 友好空状态，引导上传

@@ -100,7 +100,7 @@ ORM 新模型务必在 `app/models/__init__.py` 中导出，否则 autogenerate 
 
 ## 5. 扩展指南
 
-### 5.1 新增 StrategyType（M3 之后）
+### 5.1 新增 StrategyType
 
 1. 在 `backend/app/classify/strategy_types/<name>.py` 实现 `StrategyType` ABC：
    ```python
@@ -110,24 +110,26 @@ ORM 新模型务必在 `app/models/__init__.py` 中导出，否则 autogenerate 
        description = "..."
        param_schema = {...}      # JSONSchema 形式
 
+       def validate_params(self, params): ...
        async def run(self, items, params, ctx): ...
    ```
-2. 在 `strategy_types/registry.py` 注册
-3. 在 `backend/tests/strategy_types/test_<name>.py` 写单测
-4. 前端无需改动——配置面板按 `param_schema` 自动渲染
+2. 在 `backend/app/classify/strategy_types/__init__.py` 顶部 `import` 并调用 `register(MyStrategy())`（`register` 来自 `strategy_types/registry.py`）
+3. 在 `backend/tests/classify/test_<name>.py` 写单测（参考 `test_ai_classify.py` 用 FakeSession 模式）
+4. 前端无需改动——`/settings/pipeline` 配置面板按 `param_schema` 自动渲染参数表单
 
-### 5.2 新增 AI Provider（M4 之后）
+### 5.2 新增 AI Provider
 
-1. `backend/app/ai/providers/<name>.py` 继承 `LLMProvider`，实现 `classify()`
-2. `ai/registry.py` 加入 `PROVIDER_REGISTRY`
-3. 如果是 OpenAI 兼容协议（base_url + model_name + key），优先复用 `openai_compat.py`，仅注册一个 entry
+1. 在 `backend/app/ai/providers/<name>.py` 继承 `LLMProvider`，实现 `async def chat(*, prompt, model, api_key, base_url) -> str`
+2. 在 `backend/app/ai/registry.py` 顶部 import 并加入 `PROVIDERS` 字典（循环里 `_register(...)`）
+3. 如果是 OpenAI 兼容协议（base_url + model_name + key），优先继承 `openai_compat._OpenAICompatBase`，仅覆盖 `provider_key` / `default_base_url` / `suggested_models` 三个属性
 
 ---
 
 ## 6. 测试约定
 
-- 后端：pytest + pytest-asyncio。每个 StrategyType 一份单测，纯 in-memory 跑（不连 DB）
-- 前端：M1-M4 不强制 e2e，关键页面用 vitest（M5 引入）
+- 后端：pytest + pytest-asyncio。当前覆盖：`tests/parsers/`（alipay/wechat 各 4 个）+ `tests/classify/`（ai_classify 用 FakeSession + mock provider 5 个），合计 13 个
+- 新增 StrategyType / Provider 时务必补一份单测，纯 in-memory 跑（不连 DB、不连真 LLM）
+- 前端：MVP 阶段没有引入 vitest / Playwright，依赖 `uv run pytest` + 类型检查保证后端正确，前端靠人工点点确认
 - 测试数据：用最小化、无业务含义的 fixture；不复用任何个人账单
 
 ---

@@ -10,10 +10,15 @@
 - `/settings/incomes`：表格按 year_month + source 拆行
 
 ## API
-- `GET /api/v1/assets?month=`
-- `POST/PATCH/DELETE /api/v1/assets[/:id]`
-- `GET /api/v1/incomes?year=`
-- `POST/PATCH/DELETE /api/v1/incomes[/:id]`
+- `GET /api/v1/assets?month=YYYY-MM`
+- `POST /api/v1/assets`
+- `PATCH /api/v1/assets/:id`
+- `DELETE /api/v1/assets/:id`
+- `POST /api/v1/assets/copy` body `{from_month, to_month, overwrite?}` — 从某月复制资产快照到目标月
+- `GET /api/v1/incomes?year= | ?month=`
+- `POST /api/v1/incomes`
+- `PATCH /api/v1/incomes/:id`
+- `DELETE /api/v1/incomes/:id`
 
 ## 数据模型
 - `assets(id, user_id, snapshot_month, asset_type, account_name, amount Numeric(14,2), remark)` INDEX `(user_id, snapshot_month)`

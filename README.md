@@ -1,8 +1,10 @@
 # Bill Classifier Web
 
-通用账单分类 Web 系统。上传支付宝 / 微信账单 CSV，使用可视化配置的"策略 Pipeline"（精确匹配、子串匹配、正则、时间窗扩散、邻近推断、AI 兜底等）自动归类到用户自定义的业务分类，并提供报表、资产与收入管理页面。
+通用账单分类 Web 系统。上传支付宝 / 微信账单 CSV，按用户在 Web 上编排的「策略 Pipeline」自动归类到用户自定义的业务分类，并提供报表、资产与收入管理页面。
 
-**通用配置驱动**：系统只提供策略类型作为能力；所有类别、字典、规则、Pipeline 顺序、AI prompt 文本——全部由用户在 Web 界面创建。
+**通用配置驱动**：系统提供 `StrategyType` 扩展骨架（ABC + 注册器 + Pipeline runner）；**当前迭代仅内置 `ai_classify` 一种策略**——把用户填写的多条文本规则注入 prompt template，逐条账单调 LLM 分类。支持 6 个 LLM provider（openai / qwen / glm / kimi / claude / gemini）。其他策略类型（精确匹配 / 合并 / 时间窗扩散等）按需后续单独迭代，新增只需加一个文件 + register 一行，前端无需改动。
+
+所有类别、tag、字典、AI 凭据、AI prompt 文本、Pipeline 顺序——全部由用户在 Web 界面创建，代码 0 业务数据。
 
 ---
 
@@ -15,12 +17,14 @@ cp .env.example .env
 # 至少修改：BCW_JWT_SECRET、BCW_FERNET_KEY（用下面命令生成 Fernet key）
 # python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 
-make dev                   # 起 mysql + backend + frontend
-make migrate               # alembic upgrade head（首次必须）
+make dev                   # 起 mysql + backend + frontend（backend 容器启动时会自动跑 alembic upgrade head）
 
-# 创建管理员 + 邀请码
+# 等 backend 容器 healthy 后，创建管理员 + 邀请码
 docker compose exec backend uv run python -m app.cli.seed_admin \
   --email admin@example.com --password yourpassword --invitations 3
+
+# 后续新增 migration 后手动 upgrade
+# make migrate
 ```
 
 访问：

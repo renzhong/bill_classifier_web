@@ -19,9 +19,14 @@
 - `POST /api/v1/bills/:id/reclassify`
 - `POST /api/v1/bills/batch` body `{ids:[], action: 'set_category'|'add_tag'|'delete', payload}`
 
+## 行为细节
+- **手动改类**：`PATCH /bills/:id` 把 `manual_overridden` 置 1，后续 Pipeline 重跑不会覆盖
+- **单条重分类**：`POST /bills/:id/reclassify` 会先清掉之前 auto 写入的 `category_id` / `classify_strategy_id` / `classify_strategy_type` / `ai_provider` / `ai_confidence`（如果 `manual_overridden=1` 则保留人工分类），然后重新走一遍当前用户的 Pipeline
+- **批量操作**：`POST /bills/batch` 支持 `set_category` / `add_tag` / `remove_tag` / `delete`
+
 ## 验收
 - 手动改类 → `manual_overridden=1`，后续 Pipeline 重跑保留
-- 单条重分类 → 重走 user 的 Pipeline，结果更新
+- 单条重分类 → 重走 user 的 Pipeline，结果更新（无 Pipeline 时返回 `classified=false`）
 - 列表分页 + 排序（默认 bill_time desc）
 - 选中后批量改类成功；批量删除有二次确认
 
