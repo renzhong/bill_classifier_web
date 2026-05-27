@@ -128,9 +128,11 @@ async def patch_bill_endpoint(
 
 @router.post("/bills/{bill_id}/reclassify")
 async def reclassify_endpoint(bill_id: int, user: CurrentUser, session: SessionDep) -> dict:
-    # M3 接入分类引擎；MVP 当前阶段返回占位
+    from app.tasks.upload_runner import reclassify_one
+
     _, _ = await get_bill_with_tags(session, user.id, bill_id)
-    return ok({"queued": False, "note": "reclassify available after M3"})
+    classified = await reclassify_one(user.id, bill_id)
+    return ok({"classified": classified})
 
 
 @router.post("/bills/batch")

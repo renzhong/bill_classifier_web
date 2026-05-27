@@ -7,7 +7,10 @@
 - 看每条账单是被哪条策略命中的
 
 ## 内置策略类型
-完整清单与参数 → [docs/strategy-types.md](../docs/strategy-types.md)。MVP 内置 12 种（含 ai_classify）。
+
+**MVP 仅内置 1 种：`ai_classify`**（调 LLM 分类，规则文本来自用户的 AI 策略）。其他策略类型按需后续单独迭代，不预先实现。完整说明 → [docs/strategy-types.md](../docs/strategy-types.md)。
+
+引擎本身（StrategyType ABC + 注册器 + Pipeline runner）已具备完整扩展性：新增策略类型只需新增一个文件并 register，前端按 `param_schema` 自动渲染，无需前端改动。
 
 ## 页面
 - `/settings/pipeline`：
@@ -27,10 +30,11 @@
 - `pipeline_steps(id, user_id, strategy_type, display_name, params JSON, sort_order, enabled, ts)`
 
 ## 验收
-- 同一策略类型可实例化多次（如 3 个 substring_match 用不同字典）
+- 同一策略类型可实例化多次
 - 调换顺序后重分类，结果按新顺序生效
 - 禁用某步骤后，该步骤不参与执行
 - 参数不合法被 `validate_params()` 拒绝
+- `ai_classify` 步骤可指定不同 strategy_id，组合不同凭据 / prompt 文本
 
 ## 不做
 - 步骤分组 / 子流程

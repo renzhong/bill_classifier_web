@@ -143,7 +143,7 @@ upload CSV → parsers → list[BillItem]
 
 **为何 param_schema 是 JSONSchema**：前端拿到一份 schema 列表后能完全自动渲染策略实例的配置面板，新增策略类型 0 前端改动。
 
-详细策略类型清单与参数见 [docs/strategy-types.md](./docs/strategy-types.md)。
+**MVP 仅内置 `ai_classify` 一种策略**。其他策略类型（精确匹配、子串匹配、合并、扩散等）将根据实际需求按需单独迭代。引擎本身已具备完整扩展性。详细见 [docs/strategy-types.md](./docs/strategy-types.md)。
 
 ---
 

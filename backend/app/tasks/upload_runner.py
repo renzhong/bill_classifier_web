@@ -1,4 +1,4 @@
-"""上传账单后台处理：解析 CSV → 入 bills 表（暂不分类，分类在 M3 接入）"""
+"""上传账单后台处理：解析 CSV → 落 bills → 跑 Pipeline → 回写分类结果"""
 from __future__ import annotations
 
 import logging
@@ -7,6 +7,8 @@ from datetime import UTC, datetime
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
+from app.classify.bill_item import ClassifyBillItem
+from app.classify.engine import run_pipeline
 from app.core.db import SessionLocal
 from app.models.bill import Bill, UploadTask
 from app.parsers import get_parser
@@ -16,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 async def process_upload(task_id: int, file_bytes: bytes) -> None:
-    """异步解析 + 落库。任何阶段失败都把 upload_task 标 failed。"""
+    """异步解析 + 落库 + 跑 Pipeline。每个阶段失败都把 upload_task 标对应状态。"""
     async with SessionLocal() as session:
         task = await session.scalar(select(UploadTask).where(UploadTask.id == task_id))
         if not task:
@@ -30,21 +32,16 @@ async def process_upload(task_id: int, file_bytes: bytes) -> None:
             parser = get_parser(task.source)
             result = parser.parse(file_bytes, owner=task.owner_label)
         except ParseError as e:
-            task.status = "failed"
-            task.error_msg = f"parse error: {e}"
-            task.finished_at = datetime.now(UTC).replace(tzinfo=None)
-            await session.commit()
+            await _mark_failed(session, task, f"parse error: {e}")
             return
         except Exception as e:  # pragma: no cover
             logger.exception("unexpected parse failure for task %s", task_id)
-            task.status = "failed"
-            task.error_msg = f"unexpected: {e}"
-            task.finished_at = datetime.now(UTC).replace(tzinfo=None)
-            await session.commit()
+            await _mark_failed(session, task, f"unexpected: {e}")
             return
 
+        inserted_bills: list[Bill] = []
         skipped_duplicate = 0
-        inserted = 0
+
         for item in result.items:
             bill = Bill(
                 user_id=task.user_id,
@@ -62,13 +59,25 @@ async def process_upload(task_id: int, file_bytes: bytes) -> None:
             session.add(bill)
             try:
                 await session.flush()
-                inserted += 1
+                inserted_bills.append(bill)
             except IntegrityError:
                 await session.rollback()
                 skipped_duplicate += 1
 
+        await session.commit()
+
+        # 跑分类 pipeline（用户没配置 step 时 run_pipeline 直接返回）
+        classified = 0
+        if inserted_bills:
+            task.status = "classifying"
+            await session.commit()
+            try:
+                classified = await _classify_and_save(session, task.user_id, inserted_bills)
+            except Exception:
+                logger.exception("pipeline failed for task %s", task_id)
+
         task.total_rows = len(result.items)
-        task.classified_rows = 0  # M3 分类后再填
+        task.classified_rows = classified
         task.status = "done"
         notes = []
         if result.skipped_rows:
@@ -80,4 +89,78 @@ async def process_upload(task_id: int, file_bytes: bytes) -> None:
         task.error_msg = "; ".join(notes) if notes else None
         task.finished_at = datetime.now(UTC).replace(tzinfo=None)
         await session.commit()
-        logger.info("upload_task %s done: inserted=%d skipped_dup=%d", task_id, inserted, skipped_duplicate)
+        logger.info(
+            "upload_task %s done: inserted=%d classified=%d dup=%d",
+            task_id, len(inserted_bills), classified, skipped_duplicate,
+        )
+
+
+async def _mark_failed(session, task: UploadTask, msg: str) -> None:
+    task.status = "failed"
+    task.error_msg = msg
+    task.finished_at = datetime.now(UTC).replace(tzinfo=None)
+    await session.commit()
+
+
+async def _classify_and_save(session, user_id: int, bills: list[Bill]) -> int:
+    items = [_bill_to_item(b) for b in bills]
+    items = await run_pipeline(session, user_id, items)
+    classified = 0
+    by_id = {b.id: b for b in bills}
+    for it in items:
+        b = by_id.get(it.id)
+        if not b:
+            continue
+        if it.category_id is not None or it.lifecycle != "unprocessed":
+            b.category_id = it.category_id
+            b.classify_strategy_id = it.classify_strategy_id
+            b.classify_strategy_type = it.classify_strategy_type
+            b.lifecycle = it.lifecycle if it.lifecycle != "unprocessed" else b.lifecycle
+            b.skip_reason = it.skip_reason
+            b.ai_provider = it.ai_provider
+            b.ai_confidence = it.ai_confidence
+            if it.category_id is not None:
+                classified += 1
+    await session.commit()
+    return classified
+
+
+def _bill_to_item(b: Bill) -> ClassifyBillItem:
+    return ClassifyBillItem(
+        id=b.id,
+        source=b.source,
+        payee=b.payee,
+        item_name=b.item_name,
+        amount=b.amount,
+        bill_type=b.bill_type,  # type: ignore[arg-type]
+        bill_time=b.bill_time,
+        owner=b.owner,
+        order_id=b.order_id,
+        category_id=b.category_id,
+        classify_strategy_id=b.classify_strategy_id,
+        classify_strategy_type=b.classify_strategy_type,
+        lifecycle=b.lifecycle,
+    )
+
+
+async def reclassify_one(user_id: int, bill_id: int) -> bool:
+    """单条账单重新跑 Pipeline；返回是否命中分类"""
+    async with SessionLocal() as session:
+        bill = await session.scalar(
+            select(Bill).where(Bill.id == bill_id, Bill.user_id == user_id)
+        )
+        if not bill:
+            return False
+        # 重新跑前清掉之前的分类结果（手工标记不被重置）
+        if not bill.manual_overridden:
+            bill.category_id = None
+            bill.classify_strategy_id = None
+            bill.classify_strategy_type = None
+            bill.lifecycle = "unprocessed"
+            bill.skip_reason = None
+            bill.ai_provider = None
+            bill.ai_confidence = None
+            await session.commit()
+
+        classified = await _classify_and_save(session, user_id, [bill])
+        return classified > 0
