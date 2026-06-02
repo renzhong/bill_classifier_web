@@ -34,10 +34,10 @@ class StrategyType(ABC):
     @abstractmethod
     async def run(
         self,
-        items: list["ClassifyBillItem"],
+        items: list[ClassifyBillItem],
         params: dict,
-        ctx: "ClassifyContext",
-    ) -> list["ClassifyBillItem"]: ...
+        ctx: ClassifyContext,
+    ) -> list[ClassifyBillItem]: ...
 
     def metadata(self) -> dict:
         return {

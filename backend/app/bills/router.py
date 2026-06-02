@@ -50,7 +50,7 @@ async def upload_bill(
         session=session,
         user_id=user.id,
         source=source,
-        filename=file.filename or "uploaded.csv",
+        filename=file.filename or "uploaded",
         file_size=len(raw),
         tag_ids=tag_id_list,
         owner_label=owner_label,

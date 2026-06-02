@@ -55,7 +55,7 @@ class Bill(Base):
 
     source: Mapped[str] = mapped_column(String(16))
     owner: Mapped[str | None] = mapped_column(String(32))
-    order_id: Mapped[str | None] = mapped_column(String(64))
+    order_id: Mapped[str | None] = mapped_column(String(128))
     payee: Mapped[str | None] = mapped_column(String(255))
     item_name: Mapped[str | None] = mapped_column(String(512))
     amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)

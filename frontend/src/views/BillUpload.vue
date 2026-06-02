@@ -76,12 +76,12 @@ async function onSubmit() {
           placeholder="可选"
         />
       </n-form-item>
-      <n-form-item label="CSV 文件">
+      <n-form-item label="账单文件">
         <n-upload
           v-model:file-list="fileList"
           :max="1"
           :custom-request="customRequest"
-          accept=".csv,text/csv"
+          accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         >
           <n-button>选择文件</n-button>
         </n-upload>

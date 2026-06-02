@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 @dataclass
 class ClassifyContext:
     user_id: int
-    session: "AsyncSession"
+    session: AsyncSession
     step_id: int                              # 当前 pipeline_step.id
-    categories: list["Category"] = field(default_factory=list)
+    categories: list[Category] = field(default_factory=list)
     extras: dict[str, Any] = field(default_factory=dict)
