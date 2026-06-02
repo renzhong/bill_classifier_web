@@ -3,20 +3,20 @@ from typing import Any
 
 from cryptography.fernet import Fernet, InvalidToken
 from jose import JWTError, jwt
-from passlib.context import CryptContext
+from pwdlib import PasswordHash
 
 from app.core.config import get_settings
 
 _settings = get_settings()
-_pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
+_pwd_hasher = PasswordHash.recommended()
 
 
 def hash_password(raw: str) -> str:
-    return _pwd_ctx.hash(raw)
+    return _pwd_hasher.hash(raw)
 
 
 def verify_password(raw: str, hashed: str) -> bool:
-    return _pwd_ctx.verify(raw, hashed)
+    return _pwd_hasher.verify(raw, hashed)
 
 
 def create_access_token(subject: str | int, extra: dict[str, Any] | None = None) -> str:
