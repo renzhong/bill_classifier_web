@@ -16,13 +16,13 @@ WORKDIR /app
 # ===== dev: 仅放工具，源码走 volume =====
 FROM base AS dev
 COPY backend/pyproject.toml backend/uv.lock* ./
-RUN uv sync --frozen || uv sync
+RUN uv sync --frozen
 EXPOSE 8000
 
 # ===== builder: 锁依赖 =====
 FROM base AS builder
 COPY backend/pyproject.toml backend/uv.lock* ./
-RUN uv sync --frozen --no-dev || uv sync --no-dev
+RUN uv sync --frozen --no-dev
 
 # ===== runtime: 精简产物 =====
 FROM python:3.11-slim AS runtime
@@ -41,4 +41,4 @@ COPY --from=builder /app/.venv /app/.venv
 COPY backend/pyproject.toml backend/uv.lock* /app/
 COPY backend /app
 EXPOSE 8000
-CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

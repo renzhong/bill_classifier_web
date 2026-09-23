@@ -1,6 +1,7 @@
 """上传文件分发：识别 csv / xlsx 后路由到 declared_source 对应的 parser"""
 from __future__ import annotations
 
+import codecs
 from typing import Literal
 
 from app.parsers import get_parser
@@ -23,7 +24,8 @@ def sniff(data: bytes, filename: str) -> FileKind:
     probe = data[:4096]
     for enc in ("utf-8", "utf-8-sig", "gbk"):
         try:
-            probe.decode(enc)
+            # The probe can end in the middle of a valid multibyte character.
+            codecs.getincrementaldecoder(enc)().decode(probe, final=len(data) <= len(probe))
             return "csv"
         except UnicodeDecodeError:
             continue

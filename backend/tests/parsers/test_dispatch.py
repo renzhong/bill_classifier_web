@@ -45,6 +45,12 @@ def test_sniff_csv_gbk():
     assert sniff(data, "x.csv") == "csv"
 
 
+@pytest.mark.parametrize("encoding", ["utf-8", "gbk"])
+def test_sniff_csv_with_multibyte_character_at_probe_boundary(encoding):
+    data = b"a" * 4095 + "交易号,金额\nT1,1.00\n".encode(encoding)
+    assert sniff(data, "x.csv") == "csv"
+
+
 def test_sniff_binary_garbage_is_unknown():
     data = bytes([0xFF, 0xFE, 0xFD, 0xFC, 0x00, 0x80, 0x81, 0x82] * 8)
     assert sniff(data, "x.bin") == "unknown"

@@ -8,7 +8,7 @@ dependencies = [
     "uvicorn[standard]>=0.32",
     "pydantic[email]>=2.9",
     "pydantic-settings>=2.6",
-    "sqlalchemy>=2.0.36",
+    "sqlalchemy[asyncio]>=2.0.36",
     "asyncmy>=0.2.10",
     "pymysql>=1.1",
     "alembic>=1.14",
@@ -44,3 +44,4 @@ ignore = ["E501"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+markers = ["mysql: requires a migrated, disposable MySQL database and BCW_TEST_MYSQL=1"]

@@ -17,7 +17,7 @@ echarts.use([
   CanvasRenderer,
 ])
 
-const props = defineProps<{ option: object; height?: string }>()
+const props = defineProps<{ option: echarts.EChartsCoreOption; height?: string }>()
 
 const root = ref<HTMLDivElement>()
 let inst: echarts.ECharts | null = null

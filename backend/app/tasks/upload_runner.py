@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 from datetime import UTC, datetime
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.exc import DataError, IntegrityError
 
 from app.classify.bill_item import ClassifyBillItem
@@ -36,11 +36,11 @@ async def process_upload(task_id: int, file_bytes: bytes) -> None:
                 owner=task.owner_label,
             )
         except ParseError as e:
-            await _mark_failed(session, task, f"parse error: {e}")
+            await _mark_failed(session, task_id, f"parse error: {e}")
             return
         except Exception as e:  # pragma: no cover
             logger.exception("unexpected parse failure for task %s", task_id)
-            await _mark_failed(session, task, f"unexpected: {e}")
+            await _mark_failed(session, task_id, f"unexpected: {e}")
             return
 
         try:
@@ -53,10 +53,7 @@ async def process_upload(task_id: int, file_bytes: bytes) -> None:
             if inserted_bills:
                 task.status = "classifying"
                 await session.commit()
-                try:
-                    classified = await _classify_and_save(session, task.user_id, inserted_bills)
-                except Exception:
-                    logger.exception("pipeline failed for task %s", task_id)
+                classified = await _classify_and_save(session, task.user_id, inserted_bills)
 
             task.total_rows = len(result.items)
             task.classified_rows = classified
@@ -70,7 +67,7 @@ async def process_upload(task_id: int, file_bytes: bytes) -> None:
                 notes.append(f"skipped {skipped_data} data-too-long ({first_data_err})")
             if result.errors:
                 notes.append(f"errors: {len(result.errors)} (first: {result.errors[0][:120]})")
-            task.error_msg = "; ".join(notes) if notes else None
+            task.error_msg = "; ".join(notes)[:1024] if notes else None
             task.finished_at = datetime.now(UTC).replace(tzinfo=None)
             await session.commit()
             logger.info(
@@ -79,7 +76,7 @@ async def process_upload(task_id: int, file_bytes: bytes) -> None:
             )
         except Exception as e:  # 兜底：任何未预期错误都把 task 标 failed，避免悬挂在 parsing
             logger.exception("post-parse failure for task %s", task_id)
-            await _mark_failed(session, task, f"post-parse: {e}")
+            await _mark_failed(session, task_id, f"post-parse: {e}")
             return
 
 
@@ -103,15 +100,14 @@ async def _insert_bills(session, task: UploadTask, items: list) -> tuple[list[Bi
             bill_time=item.bill_time,
             lifecycle="unprocessed",
         )
-        session.add(bill)
         try:
-            await session.flush()
+            async with session.begin_nested():
+                session.add(bill)
+                await session.flush()
             inserted.append(bill)
         except IntegrityError:
-            await session.rollback()
             skipped_duplicate += 1
         except DataError as e:
-            await session.rollback()
             skipped_data += 1
             if first_data_err is None:
                 first_data_err = str(e.orig)[:120]
@@ -119,10 +115,15 @@ async def _insert_bills(session, task: UploadTask, items: list) -> tuple[list[Bi
     return inserted, skipped_duplicate, skipped_data, first_data_err
 
 
-async def _mark_failed(session, task: UploadTask, msg: str) -> None:
-    task.status = "failed"
-    task.error_msg = msg
-    task.finished_at = datetime.now(UTC).replace(tzinfo=None)
+async def _mark_failed(session, task_id: int, msg: str) -> None:
+    # A failed flush must be rolled back before recording a terminal status.
+    # Use the saved ID because rollback expires ORM instances in async sessions.
+    await session.rollback()
+    await session.execute(
+        update(UploadTask)
+        .where(UploadTask.id == task_id)
+        .values(status="failed", error_msg=msg[:1024], finished_at=datetime.now(UTC).replace(tzinfo=None))
+    )
     await session.commit()
 
 
