@@ -38,7 +38,7 @@ async def list_dicts(user: CurrentUser, session: SessionDep) -> dict:
     ).all()
     counts_rows = await session.execute(
         select(UserDictEntry.dict_id, func.count(UserDictEntry.id))
-        .where(UserDictEntry.dict_id.in_([d.id for d in rows]) if rows else [])
+        .where(UserDictEntry.dict_id.in_([d.id for d in rows]))
         .group_by(UserDictEntry.dict_id)
     )
     counts = {did: cnt for did, cnt in counts_rows}

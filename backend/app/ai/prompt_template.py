@@ -53,7 +53,7 @@ def build_prompt(
     *,
     rules: list[str],
     category_names: list[str],
-    bill: "ClassifyBillItem",
+    bill: ClassifyBillItem,
 ) -> str:
     return SYSTEM_TEMPLATE.format(
         categories=_format_categories(category_names),

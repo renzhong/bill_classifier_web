@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, Query, UploadFile, status
 
@@ -30,7 +31,7 @@ async def upload_bill(
     user: CurrentUser,
     session: SessionDep,
     background: BackgroundTasks,
-    file: UploadFile = File(...),
+    file: Annotated[UploadFile, File()],
     source: str = Form(...),
     owner_label: str | None = Form(default=None),
     tag_ids: str = Form(default="[]"),
@@ -50,7 +51,7 @@ async def upload_bill(
         session=session,
         user_id=user.id,
         source=source,
-        filename=file.filename or "uploaded.csv",
+        filename=file.filename or "uploaded",
         file_size=len(raw),
         tag_ids=tag_id_list,
         owner_label=owner_label,

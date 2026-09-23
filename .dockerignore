@@ -5,6 +5,7 @@
 **/.pytest_cache
 **/.mypy_cache
 **/.ruff_cache
+**/.uv-cache
 **/htmlcov
 
 # Node
@@ -20,6 +21,9 @@ frontend/.vite
 # Git
 .git
 .gitignore
+.claude
+samples
+backend/tests/parsers/samples
 
 # Docs / dev-only
 docker/mysql/data

@@ -13,7 +13,7 @@ from app.parsers._common import (
     parse_time,
     read_rows,
 )
-from app.parsers.base import BillItem, ParseError, ParseResult, Parser
+from app.parsers.base import BillItem, ParseError, Parser, ParseResult
 
 REQUIRED_COLS = ["交易号", "商品", "金额"]
 
@@ -23,8 +23,11 @@ class AlipayParser(Parser):
 
     def parse(self, data: bytes, owner: str | None = None) -> ParseResult:
         rows = read_rows(data, prefer_encoding="gbk")
+        return self.parse_rows(rows, owner=owner)
+
+    def parse_rows(self, rows: list[list[str]], owner: str | None = None) -> ParseResult:
         if not rows:
-            raise ParseError("empty csv")
+            raise ParseError("empty data")
 
         data_block = _extract_data_block(rows)
         if not data_block:

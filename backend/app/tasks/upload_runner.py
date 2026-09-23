@@ -4,15 +4,15 @@ from __future__ import annotations
 import logging
 from datetime import UTC, datetime
 
-from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy import select, update
+from sqlalchemy.exc import DataError, IntegrityError
 
 from app.classify.bill_item import ClassifyBillItem
 from app.classify.engine import run_pipeline
 from app.core.db import SessionLocal
 from app.models.bill import Bill, UploadTask
-from app.parsers import get_parser
 from app.parsers.base import ParseError
+from app.parsers.dispatch import parse_upload
 
 logger = logging.getLogger(__name__)
 
@@ -29,76 +29,101 @@ async def process_upload(task_id: int, file_bytes: bytes) -> None:
         await session.commit()
 
         try:
-            parser = get_parser(task.source)
-            result = parser.parse(file_bytes, owner=task.owner_label)
+            result = parse_upload(
+                file_bytes,
+                filename=task.filename or "",
+                declared_source=task.source,
+                owner=task.owner_label,
+            )
         except ParseError as e:
-            await _mark_failed(session, task, f"parse error: {e}")
+            await _mark_failed(session, task_id, f"parse error: {e}")
             return
         except Exception as e:  # pragma: no cover
             logger.exception("unexpected parse failure for task %s", task_id)
-            await _mark_failed(session, task, f"unexpected: {e}")
+            await _mark_failed(session, task_id, f"unexpected: {e}")
             return
 
-        inserted_bills: list[Bill] = []
-        skipped_duplicate = 0
-
-        for item in result.items:
-            bill = Bill(
-                user_id=task.user_id,
-                upload_task_id=task.id,
-                source=item.source,
-                owner=item.owner,
-                order_id=item.order_id,
-                payee=item.payee,
-                item_name=item.item_name,
-                amount=item.amount,
-                bill_type=item.bill_type,
-                bill_time=item.bill_time,
-                lifecycle="unprocessed",
-            )
-            session.add(bill)
-            try:
-                await session.flush()
-                inserted_bills.append(bill)
-            except IntegrityError:
-                await session.rollback()
-                skipped_duplicate += 1
-
-        await session.commit()
-
-        # 跑分类 pipeline（用户没配置 step 时 run_pipeline 直接返回）
-        classified = 0
-        if inserted_bills:
-            task.status = "classifying"
+        try:
+            inserted_bills, skipped_duplicate, skipped_data, first_data_err = \
+                await _insert_bills(session, task, result.items)
             await session.commit()
-            try:
+
+            # 跑分类 pipeline（用户没配置 step 时 run_pipeline 直接返回）
+            classified = 0
+            if inserted_bills:
+                task.status = "classifying"
+                await session.commit()
                 classified = await _classify_and_save(session, task.user_id, inserted_bills)
-            except Exception:
-                logger.exception("pipeline failed for task %s", task_id)
 
-        task.total_rows = len(result.items)
-        task.classified_rows = classified
-        task.status = "done"
-        notes = []
-        if result.skipped_rows:
-            notes.append(f"skipped {result.skipped_rows} bad rows")
-        if skipped_duplicate:
-            notes.append(f"skipped {skipped_duplicate} duplicates")
-        if result.errors:
-            notes.append(f"errors: {len(result.errors)} (first: {result.errors[0][:120]})")
-        task.error_msg = "; ".join(notes) if notes else None
-        task.finished_at = datetime.now(UTC).replace(tzinfo=None)
-        await session.commit()
-        logger.info(
-            "upload_task %s done: inserted=%d classified=%d dup=%d",
-            task_id, len(inserted_bills), classified, skipped_duplicate,
+            task.total_rows = len(result.items)
+            task.classified_rows = classified
+            task.status = "done"
+            notes = []
+            if result.skipped_rows:
+                notes.append(f"skipped {result.skipped_rows} bad rows")
+            if skipped_duplicate:
+                notes.append(f"skipped {skipped_duplicate} duplicates")
+            if skipped_data:
+                notes.append(f"skipped {skipped_data} data-too-long ({first_data_err})")
+            if result.errors:
+                notes.append(f"errors: {len(result.errors)} (first: {result.errors[0][:120]})")
+            task.error_msg = "; ".join(notes)[:1024] if notes else None
+            task.finished_at = datetime.now(UTC).replace(tzinfo=None)
+            await session.commit()
+            logger.info(
+                "upload_task %s done: inserted=%d classified=%d dup=%d data_err=%d",
+                task_id, len(inserted_bills), classified, skipped_duplicate, skipped_data,
+            )
+        except Exception as e:  # 兜底：任何未预期错误都把 task 标 failed，避免悬挂在 parsing
+            logger.exception("post-parse failure for task %s", task_id)
+            await _mark_failed(session, task_id, f"post-parse: {e}")
+            return
+
+
+async def _insert_bills(session, task: UploadTask, items: list) -> tuple[list[Bill], int, int, str | None]:
+    """逐条插 bill，重复 / 数据过长都跳过；返回 (inserted, dup_count, data_err_count, first_data_err)"""
+    inserted: list[Bill] = []
+    skipped_duplicate = 0
+    skipped_data = 0
+    first_data_err: str | None = None
+    for item in items:
+        bill = Bill(
+            user_id=task.user_id,
+            upload_task_id=task.id,
+            source=item.source,
+            owner=item.owner,
+            order_id=item.order_id,
+            payee=item.payee,
+            item_name=item.item_name,
+            amount=item.amount,
+            bill_type=item.bill_type,
+            bill_time=item.bill_time,
+            lifecycle="unprocessed",
         )
+        try:
+            async with session.begin_nested():
+                session.add(bill)
+                await session.flush()
+            inserted.append(bill)
+        except IntegrityError:
+            skipped_duplicate += 1
+        except DataError as e:
+            skipped_data += 1
+            if first_data_err is None:
+                first_data_err = str(e.orig)[:120]
+            logger.warning("bill skipped due to DataError (order_id=%r): %s", item.order_id, e.orig)
+    return inserted, skipped_duplicate, skipped_data, first_data_err
 
 
-async def _mark_failed(session, task: UploadTask, msg: str) -> None:
-    task.status = "failed"
-    task.error_msg = msg
-    task.finished_at = datetime.now(UTC).replace(tzinfo=None)
+async def _mark_failed(session, task_id: int, msg: str) -> None:
+    # A failed flush must be rolled back before recording a terminal status.
+    # Use the saved ID because rollback expires ORM instances in async sessions.
+    await session.rollback()
+    await session.execute(
+        update(UploadTask)
+        .where(UploadTask.id == task_id)
+        .values(status="failed", error_msg=msg[:1024], finished_at=datetime.now(UTC).replace(tzinfo=None))
+    )
     await session.commit()
 
 

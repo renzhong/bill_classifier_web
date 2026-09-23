@@ -2,7 +2,7 @@
 import { h, onMounted, ref } from 'vue'
 import {
   NCard, NDataTable, NSpace, NButton, NInput, NPopconfirm, NModal,
-  NForm, NFormItem, NColorPicker, useMessage, type DataTableColumns,
+  NForm, NFormItem, NColorPicker, NInputNumber, useMessage, type DataTableColumns,
 } from 'naive-ui'
 import { categoryApi, type Category } from '@/api/meta'
 import { useMetaStore } from '@/stores/meta'
@@ -115,7 +115,7 @@ onMounted(load)
           <n-color-picker v-model:value="editing.color" />
         </n-form-item>
         <n-form-item label="排序">
-          <n-input v-model:value="editing.sort_order" type="text" />
+          <n-input-number :value="editing.sort_order" :precision="0" @update:value="editing.sort_order = $event ?? 0" />
         </n-form-item>
       </n-form>
       <template #footer>

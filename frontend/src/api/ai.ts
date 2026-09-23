@@ -37,7 +37,7 @@ export const aiApi = {
   patchCredential: (id: number, body: Partial<{ model_name: string; api_key: string; base_url: string | null; enabled: boolean }>) =>
     request.patch<unknown, AiCredential>(`/ai/credentials/${id}`, body),
   deleteCredential: (id: number) =>
-    request.delete<unknown, { deleted: number }>(`/ai/credentials/${id}`),
+    request.delete<unknown, { deleted: number; unbound_strategies: number }>(`/ai/credentials/${id}`),
 
   listStrategies: () => request.get<unknown, AiStrategy[]>('/ai/strategies'),
   createStrategy: (body: Partial<AiStrategy>) =>
