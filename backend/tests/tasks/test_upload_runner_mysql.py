@@ -1,52 +1,19 @@
 """Real transaction regressions; never connect to the normal development database."""
 
-import os
 from datetime import datetime
 from io import BytesIO
-from uuid import uuid4
 
 import pytest
 from httpx import ASGITransport, AsyncClient
 from openpyxl import Workbook
-from sqlalchemy import delete, select
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
-from sqlalchemy.pool import NullPool
+from sqlalchemy import select
 
-from app.core.config import get_settings
 from app.core.security import hash_password
 from app.models.bill import Bill, UploadTask
 from app.models.user import User
 from app.tasks import upload_runner
 
 pytestmark = pytest.mark.mysql
-
-
-@pytest.fixture
-async def upload_db(monkeypatch):
-    if os.getenv("BCW_TEST_MYSQL") != "1":
-        pytest.skip("set BCW_TEST_MYSQL=1 to run against a disposable MySQL database")
-    settings = get_settings()
-    assert settings.db_name.endswith("_test"), "Refuse to use a non-test database"
-    engine = create_async_engine(settings.database_url, poolclass=NullPool)
-    sessions = async_sessionmaker(engine, expire_on_commit=False)
-    monkeypatch.setattr(upload_runner, "SessionLocal", sessions)
-    async with sessions() as session:
-        user = User(email=f"{uuid4().hex}@example.com", password_hash="unused")
-        session.add(user)
-        await session.flush()
-        task = UploadTask(user_id=user.id, source="wechat", filename="synthetic.csv")
-        session.add(task)
-        await session.commit()
-        user_id, task_id = user.id, task.id
-    try:
-        yield sessions, task_id, user_id
-    finally:
-        async with sessions() as session:
-            await session.execute(delete(Bill).where(Bill.user_id == user_id))
-            await session.execute(delete(UploadTask).where(UploadTask.user_id == user_id))
-            await session.execute(delete(User).where(User.id == user_id))
-            await session.commit()
-        await engine.dispose()
 
 
 def csv_bills(order_ids):
