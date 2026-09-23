@@ -44,7 +44,7 @@ jobs:
         with:
           version: '0.12.18'
       - run: uv sync --frozen
-      - run: uv run --frozen ruff check app tests
+      - run: uv run --frozen ruff check app tests devdata ../scripts/testdata.py
       - run: uv run --frozen alembic upgrade head
       - run: uv run --frozen python -m pytest -q
 

@@ -1,0 +1,8 @@
+[
+  {"order_id":"sample-001","time":"2026-01-01 08:30:00","payee":"示例餐厅","item":"早餐","amount":"18.50","type":"支出","status":"支付成功","expected_amount":"18.50","expected_category":"餐饮"},
+  {"order_id":"sample-002","time":"2026-01-01 09:00:00","payee":"示例地铁","item":"地铁乘车","amount":"3.00","type":"支出","status":"支付成功","expected_amount":"3.00","expected_category":"交通"},
+  {"order_id":"sample-003","time":"2026-01-02 12:00:00","payee":"示例文具店","item":"文具","amount":"42.00","type":"支出","status":"支付成功","expected_amount":"42.00","expected_category":"购物"},
+  {"order_id":"sample-004","time":"2026-02-01 12:00:00","payee":"示例日用品店","item":"日用品部分退款","amount":"100.00","type":"支出","status":"已退款(￥30.00)","expected_amount":"70.00","expected_category":"购物"},
+  {"order_id":"sample-005","time":"2026-02-02 12:00:00","payee":"示例转账人","item":"收入转账","amount":"300.00","type":"收入","status":"支付成功","expected_amount":"300.00","expected_category":null},
+  {"order_id":"00000000000000000000000000000000000000000000000000000000000000001","time":"2026-02-03 10:00:00","payee":"示例咖啡店","item":"咖啡","amount":"20.00","type":"支出","status":"支付成功","expected_amount":"20.00","expected_category":"餐饮"}
+]

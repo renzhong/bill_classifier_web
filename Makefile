@@ -2,6 +2,23 @@
 
 COMPOSE := docker compose
 
+.PHONY: testdata-init testdata-snapshot testdata-restore testdata-backend testdata-frontend
+
+testdata-init:
+	python3 scripts/testdata.py init
+
+testdata-snapshot:
+	python3 scripts/testdata.py snapshot
+
+testdata-restore:
+	python3 scripts/testdata.py restore
+
+testdata-backend:
+	python3 scripts/testdata.py backend
+
+testdata-frontend:
+	python3 scripts/testdata.py frontend
+
 dev:
 	$(COMPOSE) up -d mysql backend frontend
 	@echo "Backend  : http://localhost:$${BACKEND_HOST_PORT:-8000}/docs"

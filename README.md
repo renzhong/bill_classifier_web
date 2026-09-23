@@ -89,6 +89,8 @@ CLAUDE.md       项目开发约定（人 + AI 共同遵守）
 
 ## 文档索引
 
+- [docs/test-data.md](./docs/test-data.md) — 持久化测试库、固定 Excel 样本和 SQL 快照恢复
+
 - [arch.md](./arch.md) — 架构方案
 - [CLAUDE.md](./CLAUDE.md) — 项目开发约定
 - [prd/](./prd/) — 按模块拆分的需求文档
