@@ -12,7 +12,7 @@
 3. **编码任务优先使用 Codex 原生 Worktree。** 新业务检出已建立在 `~/codex/bill_classifier_web`，Codex 桌面应用已登记同名业务项目；旧 `stock` 项目仍指向外层目录。从业务项目新建编码任务时选择 Worktree，应用会为任务创建专属工作树。从 Local 主检出启动时，仓库 `AGENTS.md` 的手动创建规则仅作后备。只读问答与方案评审不创建空工作树。详见第 6 节。
 4. **保留目录索引、就近模块设计和渐进披露。** 这些描述当前代码，不交给 SDD 工具重复维护。复杂变更的 spec 只描述本次要改变什么。
 
-已在业务仓库初始化 Spec Kit 1.0.10 的 Codex 集成，并填写项目 constitution；CLI 安装在仓库自己的 `.venv`，虚拟环境不提交。当前没有生成真实 feature spec，也没有改动业务代码。本机主检出的配置文件仍需进入远端 `main`，新建 Worktree 或 Cloud 任务才能从该版本取得它们。Codex 应用已新增 `bill_classifier_web` 项目，旧 `stock` 项目仍保留。
+已在业务仓库初始化 Spec Kit 1.0.10 的 Codex 集成，并填写项目 constitution；CLI 安装在仓库自己的 `.venv`，虚拟环境不提交。配置文件已同步至远端 `main`，新建 Worktree 或 Cloud 任务能从该版本取得它们。当前没有生成真实 feature spec，也没有改动业务代码。Codex 应用已新增 `bill_classifier_web` 项目，旧 `stock` 项目仍保留。
 
 ## 1. 当前项目中要解决的问题
 
@@ -151,7 +151,7 @@ Matt Pocock 仓库当前提供 Codex 技能安装方式，但其原生 Codex 插
 
 “远程”需要区分三种方式：**手机 Remote** 操作已连接的电脑，代码和工作树仍在该电脑；**SSH 开发机**让项目文件与命令运行在自己的远程主机；**Codex Cloud** 则在云端容器检出仓库并运行任务。前两种可以继续使用相应主机上的 Codex 项目和工作树；手机控制要求主机保持在线，SSH 开发机需要先配置主机、项目与远端 Codex。这些方式都不是 ChatGPT Work；真实账单与本机密钥不应为试点上传。[Codex Remote](https://learn.chatgpt.com/docs/remote)、[远程连接与 SSH](https://learn.chatgpt.com/docs/remote-connections)、[Codex Cloud](https://learn.chatgpt.com/docs/environments/cloud-environment)。
 
-**Worktree 与 Cloud 是新任务的两种运行位置，不能在同一个新任务里同时选择。** 下次在本机开发新 feature 时，选业务项目和 Worktree；需要云端执行时，选 Cloud 与该 GitHub 仓库对应的云端环境。云端任务检出远端分支或提交，不能依赖本机 `.venv`、未提交文件或个人数据。先将本仓库的 Spec Kit 配置提交并推送，再在 [Codex 云端环境设置](https://chatgpt.com/codex/settings/environments) 中连接 `renzhong/bill_classifier_web`，按需配置项目级隔离依赖和测试服务；首次云端任务以读取 constitution、生成一个合成数据 feature 规格为轻量验收。[运行位置](https://learn.chatgpt.com/docs/environments/modes)、[云端环境](https://learn.chatgpt.com/docs/environments/cloud-environment)。
+**Worktree 与 Cloud 是新任务的两种运行位置，不能在同一个新任务里同时选择。** 下次在本机开发新 feature 时，选业务项目和 Worktree；需要云端执行时，选 Cloud 与该 GitHub 仓库对应的云端环境。云端任务检出远端分支或提交，不能依赖本机 `.venv`、未提交文件或个人数据。现有 [Codex 云端环境](https://chatgpt.com/codex/cloud/settings/environment/6ab37f2d1588819194423cf9ba05067e) 已在此前 `stock` 项目任务中创建并关联 `renzhong/bill_classifier_web`；本轮已将 Spec Kit 配置同步到远端 `main`。仍需从新任务界面核对环境可选，并按实际编码测试需求配置隔离依赖和服务。首次云端任务以读取 constitution、生成一个合成数据 feature 规格为轻量验收。[运行位置](https://learn.chatgpt.com/docs/environments/modes)、[云端环境](https://learn.chatgpt.com/docs/environments/cloud-environment)。
 
 ### 6.2 每个编码任务的工作树
 
@@ -161,7 +161,7 @@ Codex 桌面应用已新增 `bill_classifier_web` 项目，路径为 `/Users/zha
 
 若编码任务从业务主检出的 **Local** 模式启动，仓库根 `AGENTS.md` 当前要求代理核对状态和远端，在 `.worktrees/<任务标识>/` 手动创建一份标准 Git worktree。它仅是后备路径；这类工作树不由 Codex App 托管，任务结束后需自行核对并清理。已经在专属工作树中的任务不重复创建。只读问答和方案评审不创建工作树。
 
-`AGENTS.md` 与 Spec Kit 配置需提交并推送后，才能由远端 `main` 新建的工作树和云端任务取得。被 Git 忽略的本机配置、虚拟环境、Node 依赖和测试快照通常不随工作树出现；新工作树只在项目隔离环境内安装依赖，不复制真实账单、密钥或 SQL 快照。`.worktreeinclude` 可用于托管工作树复制指定忽略文件，但本项目不将敏感配置列入其中。[Codex Worktrees：ignored files](https://learn.chatgpt.com/docs/environments/git-worktrees)。
+`AGENTS.md` 与 Spec Kit 配置已提交并同步至远端 `main`。被 Git 忽略的本机配置、虚拟环境、Node 依赖和测试快照通常不随工作树出现；新工作树只在项目隔离环境内安装依赖，不复制真实账单、密钥或 SQL 快照。`.worktreeinclude` 可用于托管工作树复制指定忽略文件，但本项目不将敏感配置列入其中。[Codex Worktrees：ignored files](https://learn.chatgpt.com/docs/environments/git-worktrees)。
 
 工作树隔离代码，不隔离共享服务。多个任务不能并发恢复同一个持久化 MySQL 测试库；数据库、端口和依赖冲突在试点时验证。
 
@@ -183,4 +183,4 @@ Codex 桌面应用已新增 `bill_classifier_web` 项目，路径为 `/Users/zha
 | 3 | 用一个真实的、有边界的变更完成 Spec Kit 全流程，并同步当前文档 | spec、实现、测试和模块文档一致；用户能评估流程负担 |
 | 4 | 将目录覆盖、断链与必要的依赖边界检查接入现有 CI | 故意遗漏索引或改坏链接时检查准确失败 |
 
-当前执行选择是：**使用 Codex 开发、本机编码任务优先选原生 Worktree、先试 Spec Kit 核心流程，并保留 Cloud 作为可选择的独立运行位置**。GitHub Issue 按跟踪需要使用，PR 可评审规格、方案、任务与实现；Spec Kit Git 扩展不在首轮试点范围。Codex 项目与 Spec Kit 基础配置已建立；首个 feature 的完整流程、云端环境以及目录文档体系仍待验证与实施。
+当前执行选择是：**使用 Codex 开发、本机编码任务优先选原生 Worktree、先试 Spec Kit 核心流程，并保留 Cloud 作为可选择的独立运行位置**。GitHub Issue 按跟踪需要使用，PR 可评审规格、方案、任务与实现；Spec Kit Git 扩展不在首轮试点范围。Codex 项目与 Spec Kit 基础配置已建立，云端环境已有登记；首个 feature 的完整流程、云端新任务实际选择以及目录文档体系仍待验证与实施。
