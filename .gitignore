@@ -52,3 +52,6 @@ docker/mysql/data/
 # 真实账单样本（含 PII，不入库；本地备份在仓库根 /samples/）
 /samples/
 backend/tests/parsers/samples/
+
+# Session worktrees
+/.worktrees/
