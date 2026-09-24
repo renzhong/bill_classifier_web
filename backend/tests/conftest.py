@@ -18,7 +18,8 @@ async def upload_db(monkeypatch):
     from app.core.config import get_settings
     from app.models.ai import AiCredential, AiStrategy
     from app.models.bill import Bill, UploadTask
-    from app.models.category import Category
+    from app.models.category import Category, Tag
+    from app.models.invitation import InvitationCode
     from app.models.pipeline import PipelineStep
     from app.models.user import User
     from app.tasks import upload_runner
@@ -42,7 +43,8 @@ async def upload_db(monkeypatch):
         yield sessions, task_id, user_id
     finally:
         async with sessions() as session:
-            for model in (Bill, UploadTask, PipelineStep, AiStrategy, AiCredential, Category):
+            await session.execute(delete(InvitationCode).where(InvitationCode.created_by == user_id))
+            for model in (Bill, UploadTask, PipelineStep, AiStrategy, AiCredential, Category, Tag):
                 await session.execute(delete(model).where(model.user_id == user_id))
             await session.execute(delete(User).where(User.id == user_id))
             await session.commit()

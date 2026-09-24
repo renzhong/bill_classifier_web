@@ -4,13 +4,14 @@ from __future__ import annotations
 import logging
 from datetime import UTC, datetime
 
-from sqlalchemy import select, update
+from sqlalchemy import insert, select, update
 from sqlalchemy.exc import DataError, IntegrityError
 
 from app.classify.bill_item import ClassifyBillItem
 from app.classify.engine import run_pipeline
 from app.core.db import SessionLocal
-from app.models.bill import Bill, UploadTask
+from app.models.bill import Bill, BillTag, UploadTask
+from app.models.category import Tag
 from app.parsers.base import ParseError
 from app.parsers.dispatch import parse_upload
 
@@ -86,6 +87,11 @@ async def _insert_bills(session, task: UploadTask, items: list) -> tuple[list[Bi
     skipped_duplicate = 0
     skipped_data = 0
     first_data_err: str | None = None
+    tag_ids = set(task.tag_ids or [])
+    if tag_ids:
+        tag_ids = set(await session.scalars(
+            select(Tag.id).where(Tag.user_id == task.user_id, Tag.id.in_(tag_ids))
+        ))
     for item in items:
         bill = Bill(
             user_id=task.user_id,
@@ -112,6 +118,11 @@ async def _insert_bills(session, task: UploadTask, items: list) -> tuple[list[Bi
             if first_data_err is None:
                 first_data_err = str(e.orig)[:120]
             logger.warning("bill skipped due to DataError (order_id=%r): %s", item.order_id, e.orig)
+    if inserted and tag_ids:
+        await session.execute(
+            insert(BillTag),
+            [{"bill_id": bill.id, "tag_id": tag_id} for bill in inserted for tag_id in tag_ids],
+        )
     return inserted, skipped_duplicate, skipped_data, first_data_err
 
 
@@ -165,6 +176,7 @@ def _bill_to_item(b: Bill) -> ClassifyBillItem:
         classify_strategy_id=b.classify_strategy_id,
         classify_strategy_type=b.classify_strategy_type,
         lifecycle=b.lifecycle,
+        manual_overridden=b.manual_overridden,
     )
 
 

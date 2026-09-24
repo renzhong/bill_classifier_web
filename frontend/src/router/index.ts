@@ -24,6 +24,7 @@ const routes: RouteRecordRaw[] = [
       { path: 'settings/ai/strategies', name: 'settings.ai.strategies', component: () => import('@/views/SettingsAiStrategies.vue'), meta: { title: 'AI 策略' } },
       { path: 'settings/assets', name: 'settings.assets', component: () => import('@/views/SettingsAssets.vue'), meta: { title: '资产录入' } },
       { path: 'settings/incomes', name: 'settings.incomes', component: () => import('@/views/SettingsIncomes.vue'), meta: { title: '收入录入' } },
+      { path: 'settings/invitations', name: 'settings.invitations', component: () => import('@/views/SettingsInvitations.vue'), meta: { title: '邀请码管理', admin: true } },
     ],
   },
   { path: '/:pathMatch(.*)*', redirect: '/dashboard' },
@@ -34,13 +35,21 @@ const router = createRouter({
   routes,
 })
 
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
   const user = useUserStore()
   if (!to.meta.public && !user.token) {
     return { name: 'login', query: { redirect: to.fullPath } }
   }
   if (to.meta.public && user.token && (to.name === 'login' || to.name === 'register')) {
     return { name: 'dashboard' }
+  }
+  if (to.meta.admin) {
+    try {
+      if (!user.profile) await user.fetchMe()
+      if (!user.profile?.is_admin) return { name: 'dashboard' }
+    } catch {
+      return { name: 'login' }
+    }
   }
 })
 

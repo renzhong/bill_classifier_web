@@ -147,6 +147,7 @@ async def patch_bill(
         if bill.lifecycle == "unprocessed":
             bill.lifecycle = "classified"
     if tag_ids is not None:
+        await _validate_tag_ids(session, user_id, tag_ids)
         await session.execute(delete(BillTag).where(BillTag.bill_id == bill.id))
         for tid in set(tag_ids):
             session.add(BillTag(bill_id=bill.id, tag_id=tid))
@@ -181,6 +182,7 @@ async def batch_action(session: AsyncSession, user_id: int, body: BatchActionIn)
         tid = body.payload.get("tag_id")
         if tid is None:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "tag_id required")
+        await _validate_tag_ids(session, user_id, [tid])
         for bid in owned:
             exists = await session.scalar(
                 select(BillTag).where(BillTag.bill_id == bid, BillTag.tag_id == tid)
@@ -197,3 +199,13 @@ async def batch_action(session: AsyncSession, user_id: int, body: BatchActionIn)
 
     await session.commit()
     return {"affected": len(owned)}
+
+
+async def _validate_tag_ids(session: AsyncSession, user_id: int, tag_ids: list[int]) -> None:
+    if not tag_ids:
+        return
+    owned_ids = set(await session.scalars(
+        select(Tag.id).where(Tag.user_id == user_id, Tag.id.in_(tag_ids))
+    ))
+    if owned_ids != set(tag_ids):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "some tags not found")

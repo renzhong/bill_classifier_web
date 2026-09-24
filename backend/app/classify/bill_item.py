@@ -29,6 +29,7 @@ class ClassifyBillItem:
     skip_reason: str | None = None
     ai_provider: str | None = None
     ai_confidence: Decimal | None = None
+    manual_overridden: bool = False
 
     extra: dict[str, Any] = field(default_factory=dict)
 

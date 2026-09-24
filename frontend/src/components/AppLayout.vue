@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, h, ref, onMounted } from 'vue'
+import { computed, h, onMounted } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import {
   NLayout, NLayoutSider, NLayoutHeader, NLayoutContent,
@@ -21,7 +21,7 @@ function link(label: string, to: string) {
   return () => h(RouterLink, { to }, { default: () => label })
 }
 
-const menuOptions = ref<MenuOption[]>([
+const menuOptions = computed<MenuOption[]>(() => [
   { label: link('概览', '/dashboard'), key: 'dashboard' },
   {
     label: '账单', key: 'bills', children: [
@@ -47,6 +47,9 @@ const menuOptions = ref<MenuOption[]>([
       { label: link('AI 策略', '/settings/ai/strategies'), key: 'settings.ai.strategies' },
       { label: link('资产录入', '/settings/assets'), key: 'settings.assets' },
       { label: link('收入录入', '/settings/incomes'), key: 'settings.incomes' },
+      ...(user.profile?.is_admin
+        ? [{ label: link('邀请码管理', '/settings/invitations'), key: 'settings.invitations' }]
+        : []),
     ],
   },
 ])

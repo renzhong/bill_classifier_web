@@ -4,7 +4,7 @@
 
 **MVP 仅内置一种策略类型：[`ai_classify`](#ai_classify)。**
 
-其他策略类型（精确匹配、子串匹配、合并、时间窗扩散等）将根据实际需求按需单独迭代，**不会一次性预先实现**。引擎本身（`StrategyType` ABC + 注册器 + Pipeline runner）已经具备完整扩展性，新增策略类型只需新增一个文件并 register，前端按 `param_schema` 自动渲染表单，无需任何前端改动。
+其他策略类型（精确匹配、子串匹配、合并、时间窗扩散等）将根据实际需求按需单独迭代，**不会一次性预先实现**。引擎具备扩展接口；新增类型时还需检查前端参数表单是否支持其 schema。当前表单只支持整数/数字、布尔值和 `strategy_id` 下拉特例。
 
 ## 命名约定
 
@@ -30,7 +30,7 @@
 ```
 
 行为：
-- 默认只处理 `lifecycle == 'unprocessed'` 且 `category_id is None` 的账单
+- 默认只处理未分类、非终态账单；人工分类的账单始终不交给 AI，即使 `only_unclassified=false`
 - 模型返回的类别必须在当前用户的 categories 中，否则视为未命中
 - 单条调用失败（rate-limit / 网络）记录日志，不阻塞批次
 - 并发由 `max_concurrency` 控制（asyncio.Semaphore）
@@ -69,4 +69,4 @@
    ```
 2. 在 `backend/app/classify/strategy_types/__init__.py` 中 `register(MyStrategy())`
 3. 添加 `backend/tests/classify/test_<your_type>.py` 单测
-4. 前端无需改动：`/settings/pipeline` 自动展示新策略卡片，按 `param_schema` 渲染参数表单
+4. `/settings/pipeline` 会自动展示新策略卡片；若 schema 使用新字段类型，需扩展 `frontend/src/components/StrategyParamForm.vue`

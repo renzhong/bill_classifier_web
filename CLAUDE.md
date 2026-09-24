@@ -94,7 +94,7 @@ ORM 新模型务必在 `app/models/__init__.py` 中导出，否则 autogenerate 
 ### 4.4 表单/表格
 
 - 优先用 Naive UI 组件（`n-form`、`n-data-table`、`n-upload` 等）
-- 大列表用 `n-data-table-v2` 虚拟滚动
+- 当前账单明细使用 `n-data-table` 和服务端分页；需要更大列表时再评估虚拟滚动
 
 ---
 
@@ -115,7 +115,7 @@ ORM 新模型务必在 `app/models/__init__.py` 中导出，否则 autogenerate 
    ```
 2. 在 `backend/app/classify/strategy_types/__init__.py` 顶部 `import` 并调用 `register(MyStrategy())`（`register` 来自 `strategy_types/registry.py`）
 3. 在 `backend/tests/classify/test_<name>.py` 写单测（参考 `test_ai_classify.py` 用 FakeSession 模式）
-4. 前端无需改动——`/settings/pipeline` 配置面板按 `param_schema` 自动渲染参数表单
+4. 检查 `frontend/src/components/StrategyParamForm.vue` 是否支持新参数类型；当前只处理数字、布尔值和 `strategy_id` 特例
 
 ### 5.2 新增 AI Provider
 
@@ -127,7 +127,7 @@ ORM 新模型务必在 `app/models/__init__.py` 中导出，否则 autogenerate 
 
 ## 6. 测试约定
 
-- 后端：pytest + pytest-asyncio。当前覆盖：`tests/parsers/`（alipay/wechat 各 4 个）+ `tests/classify/`（ai_classify 用 FakeSession + mock provider 5 个），合计 13 个
+- 后端：pytest + pytest-asyncio，覆盖解析器、分类、安全与 MySQL 上传任务；具体用例以 `backend/tests/` 和 CI 为准
 - 新增 StrategyType / Provider 时务必补一份单测，纯 in-memory 跑（不连 DB、不连真 LLM）
 - 前端：MVP 阶段没有引入 vitest / Playwright，依赖 `uv run pytest` + 类型检查保证后端正确，前端靠人工点点确认
 - 测试数据：用最小化、无业务含义的 fixture；不复用任何个人账单
@@ -137,7 +137,7 @@ ORM 新模型务必在 `app/models/__init__.py` 中导出，否则 autogenerate 
 ## 7. 提交与分支
 
 - 主分支：`main`
-- 功能分支：`feat/<scope>` / `fix/<scope>` / `chore/<scope>`
+- 编码任务的功能分支使用 `codex/<scope>` 前缀
 - Commit message：祈使语气，主题行 ≤ 50 字符、首字母大写，正文 72 字符折行（why 为主，不写 how）
 - 主题与正文之间空一行
 

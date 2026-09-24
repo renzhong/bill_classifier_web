@@ -68,13 +68,18 @@ async function onSubmit() {
         <n-input v-model:value="form.owner_label" placeholder="例如：本人 / 配偶（可选）" />
       </n-form-item>
       <n-form-item label="附加 Tag">
-        <n-select
-          v-model:value="form.tag_ids"
-          multiple
-          filterable
-          :options="meta.tags.map((t) => ({ label: t.name, value: t.id }))"
-          placeholder="可选"
-        />
+        <div style="width: 100%">
+          <n-select
+            v-model:value="form.tag_ids"
+            multiple
+            filterable
+            :options="meta.tags.map((t) => ({ label: t.name, value: t.id }))"
+            placeholder="例如：本人、家庭；可多选"
+          />
+          <div style="margin-top: 4px; color: #777; font-size: 12px">
+            所选标签会附在本次新增的每笔账单上，可在明细页调整。
+          </div>
+        </div>
       </n-form-item>
       <n-form-item label="账单文件">
         <n-upload

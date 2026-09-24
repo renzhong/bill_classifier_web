@@ -13,10 +13,25 @@ export interface UserInfo {
   created_at: string
 }
 
+export interface Invitation {
+  id: number
+  code: string
+  max_uses: number
+  used_count: number
+  expires_at: string | null
+  revoked_at: string | null
+  created_at: string
+}
+
 export const authApi = {
   login: (payload: LoginPayload) => request.post<unknown, TokenPair>('/auth/login', payload),
   register: (payload: RegisterPayload) => request.post<unknown, UserInfo>('/auth/register', payload),
   me: () => request.get<unknown, UserInfo>('/auth/me'),
   refresh: (refresh_token: string) =>
     request.post<unknown, { access_token: string }>('/auth/refresh', { refresh_token }),
+  listInvitations: () => request.get<unknown, Invitation[]>('/auth/invitations'),
+  createInvitation: (body: { max_uses: number; expires_at?: string | null }) =>
+    request.post<unknown, Invitation>('/auth/invitations', body),
+  revokeInvitation: (id: number) =>
+    request.post<unknown, Invitation>(`/auth/invitations/${id}/revoke`),
 }

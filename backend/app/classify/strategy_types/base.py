@@ -8,8 +8,7 @@
 - ``validate_params(params)``：CRUD 写入前校验；非法应抛 ``ValueError``
 - ``run(items, params, ctx)``：异步执行；接收 ClassifyBillItem 列表，返回处理后的列表（可原地修改）
 
-引入新的策略类型只需新增一个文件 + 在 ``strategy_types/__init__.py`` 中 register 即可，
-前端无需任何改动。
+引入新的策略类型需要注册后端实现，并检查前端参数表单是否支持其 schema。
 """
 from __future__ import annotations
 

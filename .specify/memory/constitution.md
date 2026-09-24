@@ -20,7 +20,7 @@
 
 ### V. 规格只描述本次变化
 
-每个需要 Spec Kit 的新 feature 在 `specs/<feature>/` 保留规格、方案与任务，并引用已有 PRD、架构和模块文档。避免复制一份长期产品事实；完成后同步受到实际影响的持久文档。
+每个需要 Spec Kit 的新 feature 在 `specs/<feature>/` 保留规格、方案与任务，按需参考 PRD，并引用当前架构和模块文档。PRD 是规划，不作为已实现行为的依据；完成后同步受到实际影响的持久文档。
 
 ## Development Workflow
 
