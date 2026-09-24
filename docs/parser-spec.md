@@ -1,6 +1,6 @@
-# 账单 CSV 字段约定
+# 账单 CSV / XLSX 字段约定
 
-实现见 `backend/app/parsers/{alipay,wechat}.py`（M2）。本文档对齐两类账单的字段映射。
+实现见 `backend/app/parsers/{alipay,wechat,dispatch}.py`。上传支持 CSV 和 XLSX；XLSX 首个 sheet 转为行后使用相同字段映射。
 
 ## 通用 BillItem DTO
 
@@ -45,7 +45,8 @@ class BillItem:
 - 金额去掉 `¥` `,` 等符号，转 Decimal
 - 时间统一 `YYYY-MM-DD HH:MM:SS`
 - 同 `(user_id, source, order_id)` 已存在 → 静默跳过（幂等）
-- 解析失败行入 `error_msg`，不阻塞其他行
+- 单行解析失败会计入任务的 `error_msg`，其他有效行继续入库，任务可为 `done`
+- 文件格式不支持或缺少必需列时，整个任务标为 `failed`
 
 ## 不做
 - 自动识别 source（必须用户在上传时选）

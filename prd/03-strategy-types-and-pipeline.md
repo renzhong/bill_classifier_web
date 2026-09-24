@@ -2,21 +2,21 @@
 
 ## 用户故事
 - 浏览系统内置的全部策略类型，了解每种的作用
-- 把策略类型实例化（填参数）加入我的 Pipeline，可拖拽排序
-- 启停某条步骤、改参数后能重跑分类
+- 把策略类型实例化（填参数）加入我的 Pipeline，用上下按钮调整顺序
+- 启停某条步骤、改参数后可在账单明细中逐笔重分类
 - 看每条账单是被哪条策略命中的
 
 ## 内置策略类型
 
 **MVP 仅内置 1 种：`ai_classify`**（调 LLM 分类，规则文本来自用户的 AI 策略）。其他策略类型按需后续单独迭代，不预先实现。完整说明 → [docs/strategy-types.md](../docs/strategy-types.md)。
 
-引擎本身（StrategyType ABC + 注册器 + Pipeline runner）已具备完整扩展性：新增策略类型只需新增一个文件并 register，前端按 `param_schema` 自动渲染，无需前端改动。
+引擎本身（StrategyType ABC + 注册器 + Pipeline runner）已具备扩展接口；新增策略类型需实现并注册后端策略，同时核对前端参数表单是否支持所需字段类型。
 
 ## 页面
 - `/settings/pipeline`：
   - 左侧：策略类型卡片（type_key + display_name + description + "添加"按钮）
-  - 右侧：当前 Pipeline 步骤列表（拖拽排序、启停 switch、点击编辑参数、删除）
-  - 参数表单按 `param_schema`（JSONSchema）动态渲染
+  - 右侧：当前 Pipeline 步骤列表（上下按钮排序、启停 switch、点击编辑参数、删除）
+  - 参数表单按 `param_schema`（JSONSchema）渲染已支持的字段类型
 
 ## API
 - `GET /api/v1/pipeline/strategy-types` → `[{type_key, display_name, description, param_schema}]`

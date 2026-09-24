@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import {
-  NCard, NSpace, NList, NListItem, NThing, NButton, NInput, NSelect, NSwitch,
+  NCard, NSpace, NList, NListItem, NThing, NButton, NInput, NSelect,
   NPopconfirm, NModal, NForm, NFormItem, NText, useMessage,
 } from 'naive-ui'
 import { aiApi, type AiCredential, type AiStrategy } from '@/api/ai'
@@ -45,7 +45,6 @@ async function save() {
     await aiApi.patchStrategy(e.id, {
       name: e.name,
       strategy_text: e.strategy_text,
-      active: e.active,
       credential_id: e.credential_id,
     })
     await load()
@@ -99,7 +98,7 @@ onMounted(load)
           :style="{ cursor: 'pointer', background: selectedId === s.id ? '#eef5ff' : '' }"
           @click="selectedId = s.id">
           <n-thing>
-            <template #header>{{ s.name }} <n-text v-if="s.active" type="success">·active</n-text></template>
+            <template #header>{{ s.name }}</template>
             <template #header-extra>
               <n-popconfirm @positive-click="remove(s)">
                 <template #trigger><n-button size="tiny" type="error" text>删除</n-button></template>
@@ -123,9 +122,6 @@ onMounted(load)
             clearable
             :options="credentials.map((c) => ({ label: `#${c.id} ${c.provider}/${c.model_name}`, value: c.id }))"
           />
-        </n-form-item>
-        <n-form-item label="active">
-          <n-switch v-model:value="editing.active" />
         </n-form-item>
         <n-form-item label="规则文本">
           <n-input

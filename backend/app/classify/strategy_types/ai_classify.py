@@ -87,7 +87,8 @@ class AiClassifyStrategy(StrategyType):
 
         targets = [
             it for it in items
-            if (not only_unclassified) or (not it.is_terminal and it.category_id is None)
+            if not it.manual_overridden
+            and ((not only_unclassified) or (not it.is_terminal and it.category_id is None))
         ]
         if not targets:
             return items

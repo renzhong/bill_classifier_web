@@ -2,14 +2,18 @@
 
 from datetime import datetime
 from io import BytesIO
+from uuid import uuid4
 
 import pytest
+from fastapi import HTTPException
 from httpx import ASGITransport, AsyncClient
 from openpyxl import Workbook
 from sqlalchemy import select
 
+from app.bills.service import list_bills, patch_bill
 from app.core.security import hash_password
-from app.models.bill import Bill, UploadTask
+from app.models.bill import Bill, BillTag, UploadTask
+from app.models.category import Tag
 from app.models.user import User
 from app.tasks import upload_runner
 
@@ -53,6 +57,82 @@ async def test_long_order_ids_are_imported_after_migration(upload_db):
         task = await session.get(UploadTask, task_id)
         assert task.status == "done"
         assert await session.scalar(select(Bill.order_id).where(Bill.user_id == user_id)) == order_id
+
+
+async def test_upload_tags_follow_new_bills_and_duplicate_keeps_edits(upload_db):
+    sessions, task_id, user_id = upload_db
+    async with sessions() as session:
+        tag_a = Tag(user_id=user_id, name="甲")
+        tag_b = Tag(user_id=user_id, name="乙")
+        session.add_all([tag_a, tag_b])
+        await session.flush()
+        task = await session.get(UploadTask, task_id)
+        task.tag_ids = [tag_a.id, tag_b.id]
+        tag_a_id, tag_b_id = tag_a.id, tag_b.id
+        await session.commit()
+
+    await upload_runner.process_upload(task_id, csv_bills(["tagged-1"]))
+    async with sessions() as session:
+        bill = await session.scalar(select(Bill).where(Bill.user_id == user_id))
+        tags = set(await session.scalars(select(BillTag.tag_id).where(BillTag.bill_id == bill.id)))
+        assert tags == {tag_a_id, tag_b_id}
+        await session.delete(await session.get(BillTag, (bill.id, tag_b_id)))
+        retry = UploadTask(user_id=user_id, source="wechat", filename="again.csv", tag_ids=[tag_b_id])
+        session.add(retry)
+        await session.commit()
+        retry_id = retry.id
+
+    await upload_runner.process_upload(retry_id, csv_bills(["tagged-1"]))
+    async with sessions() as session:
+        tags = set(await session.scalars(select(BillTag.tag_id).where(BillTag.bill_id == bill.id)))
+        assert tags == {tag_a_id}
+        second = UploadTask(user_id=user_id, source="wechat", filename="second.csv", tag_ids=[tag_b_id])
+        session.add(second)
+        await session.commit()
+        second_id = second.id
+
+    await upload_runner.process_upload(second_id, csv_bills(["tagged-2"]))
+    async with sessions() as session:
+        second_bill = await session.scalar(select(Bill).where(Bill.order_id == "tagged-2"))
+        second_tags = set(await session.scalars(select(BillTag.tag_id).where(BillTag.bill_id == second_bill.id)))
+        assert second_tags == {tag_b_id}
+
+
+async def test_bill_tag_edit_filter_and_foreign_tag_rejection(upload_db):
+    sessions, task_id, user_id = upload_db
+    await upload_runner.process_upload(task_id, csv_bills(["tag-edit-1"]))
+    async with sessions() as session:
+        bill = await session.scalar(select(Bill).where(Bill.user_id == user_id))
+        own_tag = Tag(user_id=user_id, name="我的标签")
+        other_user = User(email=f"{uuid4().hex}@example.com", password_hash="unused")
+        session.add_all([own_tag, other_user])
+        await session.flush()
+        other_tag = Tag(user_id=other_user.id, name="别人的标签")
+        session.add(other_tag)
+        await session.commit()
+        bill_id, own_tag_id, other_tag_id, other_user_id = (
+            bill.id, own_tag.id, other_tag.id, other_user.id
+        )
+
+    try:
+        async with sessions() as session:
+            await patch_bill(session, user_id, bill_id, category_id=None, tag_ids=[own_tag_id])
+            own_rows, own_count = await list_bills(session, user_id, tag_id=own_tag_id)
+            other_rows, other_count = await list_bills(session, user_id, tag_id=other_tag_id)
+            assert own_count == 1 and own_rows[0].id == bill_id
+            assert other_count == 0 and other_rows == []
+            with pytest.raises(HTTPException) as exc:
+                await patch_bill(session, user_id, bill_id, category_id=None, tag_ids=[other_tag_id])
+            assert exc.value.status_code == 400
+
+        async with sessions() as session:
+            tags = set(await session.scalars(select(BillTag.tag_id).where(BillTag.bill_id == bill_id)))
+            assert tags == {own_tag_id}
+    finally:
+        async with sessions() as session:
+            await session.delete(await session.get(Tag, other_tag_id))
+            await session.delete(await session.get(User, other_user_id))
+            await session.commit()
 
 
 async def test_failed_transaction_can_still_mark_task_failed(upload_db, monkeypatch):

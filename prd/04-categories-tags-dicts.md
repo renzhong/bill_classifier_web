@@ -6,7 +6,7 @@
 - 维护 tag 标签，用于上传账单时附加额外标记（如归属人、用途）
 
 ## 页面
-- `/settings/categories`：表格 CRUD + 拖拽排序
+- `/settings/categories`：表格 CRUD + 上下按钮排序
 - `/settings/tags`：表格 CRUD
 - `/settings/dicts`：左侧字典列表，右侧 entries 表格 + "粘贴 CSV"按钮
 

@@ -28,13 +28,13 @@ const chartOption = computed(() => {
   const buckets = data.value?.buckets || []
   return {
     tooltip: { trigger: 'axis' },
-    legend: { data: ['收入', '支出', '结余'] },
+    legend: { data: ['账单收入', '账单支出', '收支差额'] },
     xAxis: { type: 'category', data: buckets.map((b) => b.year_month.slice(5)) },
     yAxis: { type: 'value' },
     series: [
-      { name: '收入', type: 'bar', data: buckets.map((b) => Number(b.income)), itemStyle: { color: '#52c41a' } },
-      { name: '支出', type: 'bar', data: buckets.map((b) => Number(b.expense)), itemStyle: { color: '#f5222d' } },
-      { name: '结余', type: 'line', data: buckets.map((b) => Number(b.balance)), itemStyle: { color: '#1f6feb' } },
+      { name: '账单收入', type: 'bar', data: buckets.map((b) => Number(b.income)), itemStyle: { color: '#52c41a' } },
+      { name: '账单支出', type: 'bar', data: buckets.map((b) => Number(b.expense)), itemStyle: { color: '#f5222d' } },
+      { name: '收支差额', type: 'line', data: buckets.map((b) => Number(b.balance)), itemStyle: { color: '#1f6feb' } },
     ],
   }
 })
@@ -47,9 +47,9 @@ const chartOption = computed(() => {
         <n-date-picker v-model:value="yearTs" type="year" />
       </template>
       <n-grid v-if="data" :cols="3" x-gap="16">
-        <n-gi><n-statistic label="年度总收入" :value="data.total_income" /></n-gi>
-        <n-gi><n-statistic label="年度总支出" :value="data.total_expense" /></n-gi>
-        <n-gi><n-statistic label="年度结余" :value="data.total_balance" /></n-gi>
+        <n-gi><n-statistic label="年度账单收入" :value="data.total_income" /></n-gi>
+        <n-gi><n-statistic label="年度账单支出" :value="data.total_expense" /></n-gi>
+        <n-gi><n-statistic label="账单收支差额" :value="data.total_balance" /></n-gi>
       </n-grid>
     </n-card>
     <n-card title="逐月对比">

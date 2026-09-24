@@ -1,4 +1,6 @@
 
+from datetime import UTC, datetime
+
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
 
@@ -75,3 +77,17 @@ async def create_invitation(
     await session.commit()
     await session.refresh(inv)
     return ok(InvitationOut.model_validate(inv).model_dump(mode="json"))
+
+
+@router.post("/invitations/{invitation_id}/revoke")
+async def revoke_invitation(invitation_id: int, _: AdminUser, session: SessionDep) -> dict:
+    invitation = await session.scalar(
+        select(InvitationCode).where(InvitationCode.id == invitation_id)
+    )
+    if not invitation:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "invitation code not found")
+    if invitation.revoked_at is None:
+        invitation.revoked_at = datetime.now(UTC).replace(tzinfo=None)
+        await session.commit()
+        await session.refresh(invitation)
+    return ok(InvitationOut.model_validate(invitation).model_dump(mode="json"))

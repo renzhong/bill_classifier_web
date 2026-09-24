@@ -139,6 +139,34 @@ async def test_only_unclassified_filters_terminal_items(monkeypatch, cats, ctx_f
 
 
 @pytest.mark.asyncio
+async def test_manual_category_is_never_sent_to_ai(monkeypatch, ctx_factory):
+    from app.ai.base import ClassifyResult
+    from app.classify.strategy_types import ai_classify as mod
+
+    called: list[int] = []
+
+    async def fake_classify_one(session, *, user_id, strategy_id, bill, categories):
+        called.append(bill.id)
+        return ClassifyResult(category="餐饮", confidence=Decimal("0.9"), raw="餐饮")
+
+    monkeypatch.setattr(mod, "classify_one", fake_classify_one)
+    manual = _bill(1)
+    manual.category_id = 2
+    manual.lifecycle = "classified"
+    manual.manual_overridden = True
+    automatic = _bill(2)
+    automatic.category_id = 2
+    automatic.lifecycle = "classified"
+    session = FakeSession(strategy=FakeStrategy(10, 1), credential=FakeCredential())
+
+    await AiClassifyStrategy().run(
+        [manual, automatic], {"strategy_id": 10, "only_unclassified": False}, ctx_factory(session)
+    )
+    assert called == [2]
+    assert manual.category_id == 2
+
+
+@pytest.mark.asyncio
 async def test_unknown_category_name_is_ignored(monkeypatch, cats, ctx_factory):
     from app.ai.base import ClassifyResult
     from app.classify.strategy_types import ai_classify as mod

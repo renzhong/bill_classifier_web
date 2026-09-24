@@ -1,6 +1,6 @@
 # 账单分类项目的 Codex 开发环境方案
 
-状态：Codex 与 Spec Kit 基础配置已落地，首个 feature 试点待进行 · 2026-09-24
+状态：历史方案（成文时首个 feature 试点待进行）· 2026-09-24。本次试点产物见 [`specs/001-bill-origin-tags/`](../specs/001-bill-origin-tags/)；以下其余“待进行”表述保留成文时的计划语境。
 
 业务仓库：`renzhong/bill_classifier_web`；本机独立仓库：`~/codex/bill_classifier_web`
 调查基线：`origin/main` 的 `cc3e1ea`，已在配置前核对与本机 `main` 一致。
@@ -38,7 +38,7 @@ bill_classifier_web/                    # 业务 Git 仓库根
 ├── specs/                             # 每个 feature 的 spec.md、plan.md、tasks.md
 ├── README.md                          # 人类入口
 ├── arch.md                            # 系统级架构与关键运行路径
-├── prd/                               # 产品行为；标出已实现和待实现
+├── prd/                               # 产品规划；不代表当前实现
 ├── docs/
 │   ├── repo-map.md                    # 每个跟踪目录的职责、划分理由和设计文档
 │   ├── testing.md                     # 复用已有测试说明
@@ -128,7 +128,7 @@ Matt Pocock 仓库当前提供 Codex 技能安装方式，但其原生 Codex 插
 
 采用 [官方的既有项目指南](https://github.github.com/spec-kit/guides/existing-projects.html)。仓库级初始化已在本次主检出完成：`specify-cli==1.0.10` 安装于本项目 `.venv`，使用 `--integration codex` 生成 `.specify/` 与 `.agents/skills/`，并将项目约束写入 constitution；没有向系统 Python 安装。首个真实 feature 再从业务项目的独立 Worktree 运行核心流程，核对生成的 `specs/` 及实现改动。[Codex 集成](https://github.github.com/spec-kit/reference/integrations.html)。
 
-先选一个范围明确、可以独立评审的需求，按官方技能顺序生成规格、技术方案、任务并完成收敛验证。`constitution` 从当前代码、测试和已确认约束提炼，不凭空增加“必须全面重构”之类规则。现有 PRD、模块设计是事实依据；新 spec 只写本次变化。[既有项目指南](https://github.github.com/spec-kit/guides/existing-projects.html)。
+先选一个范围明确、可以独立评审的需求，按官方技能顺序生成规格、技术方案、任务并完成收敛验证。`constitution` 从当前代码、测试和已确认约束提炼，不凭空增加“必须全面重构”之类规则。PRD 是规划输入，当前代码、测试及已核对的模块设计说明实际行为；新 spec 只写本次变化。[既有项目指南](https://github.github.com/spec-kit/guides/existing-projects.html)。
 
 试点默认将 `specs/<feature>/spec.md`、`plan.md`、`tasks.md` 作为仓库内的变更文档，在需要分享或审查实现时随代码进入 PR。**不要求每个 feature 都有 Issue**；有跟踪需求时再建 Issue，并在 PR 中引用。若确实需要把 `tasks.md` 转成独立 Issues，再单独评估可选的 `taskstoissues` 命令及其 GitHub `origin`、GitHub MCP 前提；这不是规格与方案的同步机制。[Spec Kit 命令说明](https://github.github.com/spec-kit/reference/agentic-sdd.html)。
 

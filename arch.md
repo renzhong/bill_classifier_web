@@ -54,7 +54,7 @@
 | 包管理 | uv | 速度快，与多阶段 Dockerfile 配合好 |
 | 数据库 | MySQL 8（单库，**MVP 不分表**） | 用户级数据量级足够；schema 预留 `(user_id, ...)` 前导索引，未来分表零成本 |
 | 异步 | FastAPI BackgroundTasks（同进程）+ asyncio.gather | MVP 无需 Redis；AI 调用天然并发 |
-| 鉴权 | JWT + bcrypt + 邀请码注册 | 简单稳定；邀请码控制扩张 |
+| 鉴权 | JWT + Argon2 + 邀请码注册 | 简单稳定；邀请码控制扩张 |
 | 密钥 | Fernet 对称加密 + 环境变量注入 | AI api_key 落库加密；MVP 不上 KMS |
 
 ---
@@ -116,7 +116,7 @@ users ─┬─< invitation_codes
 
 ## 6. 通用策略引擎
 
-> **现状提醒**：截至当前迭代，代码中**仅实现了 `ai_classify` 一个策略类型**。后续候选类型（精确匹配、子串匹配、合并、扩散等）都没有写在代码里，仅作为未来候选保留在 [docs/strategy-types.md](./docs/strategy-types.md) 末尾。引擎本身（ABC + 注册器 + Pipeline runner）已具备完整扩展性，新增类型只需新增一个文件 + register 一行，前端按 `param_schema` 自动渲染。
+> **现状提醒**：代码中仅实现 `ai_classify` 一个策略类型。其他类型只是[候选](./docs/strategy-types.md)；新增类型需注册后端实现，并检查前端参数表单是否支持其字段。
 
 **核心抽象**：
 
@@ -134,16 +134,17 @@ class StrategyType(ABC):
 **执行模型**：
 
 ```
-upload CSV → parsers → list[BillItem]
-           → engine.run(bill_items, user_pipeline_steps, ctx)
+upload CSV/XLSX → parsers → list[BillItem]
+           → 插入并提交新 bills（含上传标签）
+           → engine.run(新账单, user_pipeline_steps, ctx)
                  for step in steps (按 sort_order):
                      if step.enabled:
                          strategy = REGISTRY[step.strategy_type]
                          items = await strategy.run(items, step.params, ctx)
-           → 持久化到 bills 表（含 classify_strategy_id / classify_strategy_type）
+           → 回写分类结果（含 classify_strategy_id / classify_strategy_type）
 ```
 
-**为何 param_schema 是 JSONSchema**：前端拿到一份 schema 列表后能完全自动渲染策略实例的配置面板，新增策略类型 0 前端改动。
+**为何 param_schema 是 JSONSchema**：前端据此渲染当前支持的参数类型；新字段类型需扩展表单组件。
 
 **MVP 仅内置 `ai_classify` 一种策略**。其他策略类型（精确匹配、子串匹配、合并、扩散等）将根据实际需求按需单独迭代。引擎本身已具备完整扩展性。详细见 [docs/strategy-types.md](./docs/strategy-types.md)。
 
@@ -153,8 +154,8 @@ upload CSV → parsers → list[BillItem]
 
 ```python
 class LLMProvider(ABC):
-    name: str          # openai / qwen / claude / gemini / glm / kimi
-    async def classify(self, prompt: str, ctx: dict) -> ClassifyResult: ...
+    provider_key: str  # openai / qwen / claude / gemini / glm / kimi
+    async def chat(self, *, prompt: str, model: str, api_key: str, base_url: str | None) -> str: ...
 ```
 
 - **OpenAI 兼容族**（openai / qwen / glm / kimi）：共用一份 `openai_compat.py`，注册表里登记不同 entry（提供默认 base_url / 推荐 model）
@@ -171,11 +172,10 @@ Prompt 由 `prompt_template.py` 的预设 template + 用户在 `ai_strategies.st
 src/
 ├── main.ts / App.vue (NConfigProvider + 各 Provider)
 ├── router/index.ts          路由 + JWT 守卫
-├── stores/                  Pinia: user / meta / pipeline / ai
+├── stores/                  Pinia: user / meta
 ├── api/                     axios 实例 + 模块化 client
 ├── views/                   与路由一一对应
-├── components/              AppLayout / BillTable / PipelineEditor / ...
-├── composables/             useAsyncState / useMonthRange / ...
+├── components/              AppLayout / EChart / StrategyParamForm
 └── styles/global.css
 ```
 

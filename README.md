@@ -1,8 +1,8 @@
 # Bill Classifier Web
 
-通用账单分类 Web 系统。上传支付宝 / 微信账单 CSV，按用户在 Web 上编排的「策略 Pipeline」自动归类到用户自定义的业务分类，并提供报表、资产与收入管理页面。
+通用账单分类 Web 系统。上传支付宝 / 微信账单 CSV 或 XLSX，按用户在 Web 上编排的「策略 Pipeline」自动归类到用户自定义的业务分类，并提供报表、资产与收入管理页面。
 
-**通用配置驱动**：系统提供 `StrategyType` 扩展骨架（ABC + 注册器 + Pipeline runner）；**当前迭代仅内置 `ai_classify` 一种策略**——把用户填写的多条文本规则注入 prompt template，逐条账单调 LLM 分类。支持 6 个 LLM provider（openai / qwen / glm / kimi / claude / gemini）。其他策略类型（精确匹配 / 合并 / 时间窗扩散等）按需后续单独迭代，新增只需加一个文件 + register 一行，前端无需改动。
+**通用配置驱动**：系统提供 `StrategyType` 扩展骨架（ABC + 注册器 + Pipeline runner）；**当前迭代仅内置 `ai_classify` 一种策略**——把用户填写的多条文本规则注入 prompt template，逐条账单调 LLM 分类。支持 6 个 LLM provider（openai / qwen / glm / kimi / claude / gemini）。其他策略类型（精确匹配 / 合并 / 时间窗扩散等）按需后续单独迭代；新增类型需注册后端策略，并检查前端参数表单的支持情况。
 
 所有类别、tag、字典、AI 凭据、AI prompt 文本、Pipeline 顺序——全部由用户在 Web 界面创建，代码 0 业务数据。
 
@@ -51,8 +51,8 @@ backend/        FastAPI + SQLAlchemy 2.0 + Alembic + uv
 frontend/       Vue 3 + Vite + Naive UI + Pinia
 docker/         Dockerfile.backend / Dockerfile.frontend / mysql 初始化
 nginx/          nginx.conf + sites/*.conf（dev / static / prod 三套）
-prd/            按模块拆分的需求文档
-docs/           策略类型、CSV parser、API 详解
+prd/            按模块拆分的规划文档（不代表已实现）
+docs/           当前策略、解析器、API 与分类流程说明
 arch.md         架构方案
 CLAUDE.md       项目开发约定（人 + AI 共同遵守）
 ```
@@ -93,7 +93,8 @@ CLAUDE.md       项目开发约定（人 + AI 共同遵守）
 
 - [arch.md](./arch.md) — 架构方案
 - [CLAUDE.md](./CLAUDE.md) — 项目开发约定
-- [prd/](./prd/) — 按模块拆分的需求文档
+- [prd/](./prd/) — 产品规划；当前行为请看代码和 `docs/`
 - [docs/strategy-types.md](./docs/strategy-types.md) — 内置策略类型清单
-- [docs/parser-spec.md](./docs/parser-spec.md) — 账单 CSV 字段约定
+- [docs/classification-flow.md](./docs/classification-flow.md) — 分类触发、顺序和人工修改
+- [docs/parser-spec.md](./docs/parser-spec.md) — 账单 CSV / XLSX 字段约定
 - [docs/api.md](./docs/api.md) — API 总览

@@ -17,15 +17,17 @@
 - `GET /api/v1/auth/me`
 - `GET /api/v1/auth/invitations`（admin）
 - `POST /api/v1/auth/invitations`（admin）
+- `POST /api/v1/auth/invitations/:id/revoke`（admin）
 
 ## 数据模型
 - `users(id, email UNIQUE, password_hash, nickname, status, is_admin, ts)`
-- `invitation_codes(id, code UNIQUE, created_by, used_by, used_at, expires_at, max_uses, used_count, ts)`
+- `invitation_codes(id, code UNIQUE, created_by, used_by, used_at, revoked_at, expires_at, max_uses, used_count, ts)`
 
 ## 验收
 - 邀请码错误 → 注册失败提示
 - 同邮箱重复注册 → 失败
 - 邀请码达上限或过期 → 失败
+- 邀请码撤销后 → 注册失败
 - 登录后 JWT 通过 `/auth/me` 验证有效
 - 非 admin 调 `/invitations` 返回 403
 

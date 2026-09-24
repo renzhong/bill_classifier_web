@@ -42,9 +42,9 @@ const balanceColumns: DataTableColumns<{ asset_type: string; amount: string; cou
       <n-grid v-if="overview" :cols="5" x-gap="16">
         <n-gi><n-statistic label="账单支出" :value="overview.bill_expense" /></n-gi>
         <n-gi><n-statistic label="账单收入" :value="overview.bill_income" /></n-gi>
-        <n-gi><n-statistic label="申报收入" :value="overview.declared_income" /></n-gi>
-        <n-gi><n-statistic label="月末资产" :value="overview.asset_total" /></n-gi>
-        <n-gi><n-statistic label="净值变化" :value="overview.net_worth_change" /></n-gi>
+        <n-gi><n-statistic label="已录入收入合计" :value="overview.declared_income" /></n-gi>
+        <n-gi><n-statistic label="资产合计" :value="overview.asset_total" /></n-gi>
+        <n-gi><n-statistic label="资产较上月变化" :value="overview.net_worth_change" /></n-gi>
       </n-grid>
     </n-card>
 

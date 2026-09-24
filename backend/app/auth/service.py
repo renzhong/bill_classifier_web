@@ -17,6 +17,8 @@ async def register_user(session: AsyncSession, body: RegisterIn) -> User:
     )
     if not invitation:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "invitation code invalid")
+    if invitation.revoked_at is not None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "invitation code revoked")
     if invitation.used_count >= invitation.max_uses:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "invitation code exhausted")
     if invitation.expires_at:

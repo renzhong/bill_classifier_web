@@ -34,7 +34,7 @@ function update(key: string, val: any) {
         <n-select
           v-if="key === 'strategy_id'"
           :value="modelValue[key]"
-          :options="(aiStrategies || []).map((s) => ({ label: `#${s.id} ${s.name}${s.active ? ' (active)' : ''}`, value: s.id }))"
+          :options="(aiStrategies || []).map((s) => ({ label: `#${s.id} ${s.name}`, value: s.id }))"
           placeholder="选择 AI 策略"
           @update:value="(v) => update(key as string, v)"
         />

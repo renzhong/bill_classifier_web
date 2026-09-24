@@ -2,7 +2,7 @@
 import { computed, h, onMounted, reactive, ref } from 'vue'
 import {
   NCard, NDataTable, NSpace, NSelect, NInput, NButton, NPagination,
-  NDatePicker, NTag, NPopconfirm, useMessage, type DataTableColumns,
+  NDatePicker, NTag, NPopconfirm, NModal, useMessage, type DataTableColumns,
 } from 'naive-ui'
 import dayjs from 'dayjs'
 import { billApi, type Bill, type BillListQuery } from '@/api/bills'
@@ -72,6 +72,25 @@ async function reclassify(row: Bill) {
 }
 
 const selectedIds = ref<number[]>([])
+const tagEditorBill = ref<Bill | null>(null)
+const tagDraft = ref<number[]>([])
+
+function openTagEditor(row: Bill) {
+  tagEditorBill.value = row
+  tagDraft.value = [...row.tag_ids]
+}
+
+async function saveTags() {
+  if (!tagEditorBill.value) return
+  try {
+    await billApi.patch(tagEditorBill.value.id, { tag_ids: tagDraft.value })
+    tagEditorBill.value = null
+    message.success('标签已更新')
+    await load()
+  } catch (e) {
+    message.error((e as Error).message)
+  }
+}
 
 const columns = computed<DataTableColumns<Bill>>(() => [
   { type: 'selection' },
@@ -94,6 +113,20 @@ const columns = computed<DataTableColumns<Bill>>(() => [
   { title: '收款方', key: 'payee', ellipsis: { tooltip: true } },
   { title: '商品', key: 'item_name', ellipsis: { tooltip: true } },
   { title: '来源', key: 'source', width: 80 },
+  { title: '归属人', key: 'owner', width: 100, render: (r) => r.owner || '—' },
+  {
+    title: '标签',
+    key: 'tag_ids',
+    width: 220,
+    render: (row) => h(NSpace, { size: 4, align: 'center' }, () => [
+      ...row.tag_ids.map((id) => {
+        const tag = meta.tagMap.get(id)
+        return h(NTag, { size: 'small', color: tag?.color ? { color: tag.color, textColor: '#fff' } : undefined },
+          { default: () => tag?.name || `#${id}` })
+      }),
+      h(NButton, { size: 'tiny', text: true, onClick: () => openTagEditor(row) }, () => '编辑'),
+    ]),
+  },
   { title: '命中策略', key: 'classify_strategy_type', width: 130 },
   {
     title: '状态',
@@ -210,5 +243,23 @@ onMounted(async () => {
         @update:page-size="resetAndLoad"
       />
     </n-space>
+
+    <n-modal :show="tagEditorBill !== null" preset="card" title="编辑账单标签" style="width: 460px"
+      @update:show="(show: boolean) => { if (!show) tagEditorBill = null }">
+      <n-select
+        v-model:value="tagDraft"
+        multiple
+        filterable
+        clearable
+        :options="meta.tags.map((t) => ({ label: t.name, value: t.id }))"
+        placeholder="选择标签"
+      />
+      <template #footer>
+        <n-space justify="end">
+          <n-button @click="tagEditorBill = null">取消</n-button>
+          <n-button type="primary" @click="saveTags">保存</n-button>
+        </n-space>
+      </template>
+    </n-modal>
   </n-card>
 </template>

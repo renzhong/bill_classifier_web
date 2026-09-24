@@ -19,6 +19,7 @@
 | GET | /auth/me | 登录 |
 | GET | /auth/invitations | admin |
 | POST | /auth/invitations | admin |
+| POST | /auth/invitations/{id}/revoke | admin，撤销后不能注册 |
 
 ### categories / tags / dicts
 | Method | Path | 说明 |
@@ -54,9 +55,9 @@
 ### bills / upload-tasks
 | Method | Path | 说明 |
 |---|---|---|
-| POST | /bills/upload | multipart：file + source + owner_label + tag_ids |
+| POST | /bills/upload | multipart：CSV/XLSX file + source + owner_label + tag_ids；每笔新账单继承标签 |
 | GET | /bills | filter: month/source/category_id/tag_id/keyword/lifecycle/page |
-| GET PATCH | /bills/{id} | 详情 / 手工改类（manual_overridden） |
+| GET PATCH | /bills/{id} | 详情 / 手工改类（manual_overridden）/ 修改账单标签 |
 | POST | /bills/{id}/reclassify | 单条重跑 Pipeline |
 | POST | /bills/batch | set_category / add_tag / remove_tag / delete |
 | GET | /upload-tasks[/{id}] | 上传任务列表 / 详情 |
@@ -73,8 +74,8 @@
 ### reports
 | Method | Path | 说明 |
 |---|---|---|
-| GET | /reports/yearly?year=2026 | 每月 income / expense / balance + 年度合计 |
-| GET | /reports/monthly?month=2026-05 | 单月 5 项指标 + 净值变化 |
+| GET | /reports/yearly?year=2026 | 每月账单 income / expense / balance（收支差额）+ 年度合计，不含另行录入的收入 |
+| GET | /reports/monthly?month=2026-05 | 账单支出、账单收入、录入收入、资产合计、资产较上月变化 |
 | GET | /reports/category-summary?month=2026-05 | 按类别支出汇总 + 占比 |
 | GET | /reports/balance?month=2026-05 | 资产按 asset_type 汇总 |
 

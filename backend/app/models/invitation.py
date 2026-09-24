@@ -14,6 +14,7 @@ class InvitationCode(Base):
     created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), default=None)
     used_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), default=None)
     used_at: Mapped[datetime | None] = mapped_column(DateTime, default=None)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime, default=None)
     expires_at: Mapped[datetime | None] = mapped_column(DateTime, default=None)
     max_uses: Mapped[int] = mapped_column(Integer, default=1)
     used_count: Mapped[int] = mapped_column(Integer, default=0)

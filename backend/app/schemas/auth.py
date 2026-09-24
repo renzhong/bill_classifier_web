@@ -47,6 +47,7 @@ class InvitationOut(BaseModel):
     code: str
     max_uses: int
     used_count: int
+    revoked_at: datetime | None
     expires_at: datetime | None
     created_at: datetime
 
