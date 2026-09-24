@@ -37,7 +37,7 @@ onMounted(async () => {
         <n-gi><n-statistic label="账单收入" :value="overview.bill_income" /></n-gi>
         <n-gi><n-statistic label="申报收入" :value="overview.declared_income" /></n-gi>
         <n-gi><n-statistic label="月末资产" :value="overview.asset_total" /></n-gi>
-        <n-gi><n-statistic label="净值变化" :value="overview.net_worth_change" /></n-gi>
+        <n-gi><n-statistic label="净资产" :value="overview.net_assets" /></n-gi>
       </n-grid>
     </n-card>
 

@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Carbon 浅色阶 · Bill Classifier</title>
+  <style>
+    :root { font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif; color:#161616; background:#f4f4f4; }
+    * { box-sizing:border-box; }
+    body { margin:0; }
+    .wrap { max-width:990px; margin:auto; padding:44px 24px 72px; }
+    .eyebrow { font-size:12px; font-weight:800; letter-spacing:2px; color:#525252; }
+    h1 { font-size:32px; margin:9px 0; }
+    p { color:#525252; line-height:1.7; }
+    .links { display:flex; gap:10px; flex-wrap:wrap; margin:22px 0 30px; }
+    .links a { color:#161616; text-decoration:none; background:#a6c8ff; border-radius:8px; padding:11px 15px; font-weight:700; }
+    .links a:hover { background:#d0e2ff; }
+    .group { background:#fff; border:1px solid #e0e0e0; border-radius:14px; padding:23px; margin-top:18px; }
+    h2 { font-size:16px; margin:0 0 15px; }
+    .swatches { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:11px; }
+    .swatch { border:1px solid #e0e0e0; border-radius:9px; overflow:hidden; background:#fff; }
+    .color { height:95px; border-bottom:1px solid #e0e0e0; }
+    .label { padding:10px 12px; font-size:12px; display:flex; justify-content:space-between; gap:8px; }
+    .sample { display:flex; align-items:center; gap:11px; flex-wrap:wrap; padding:18px; background:#edf5ff; border-radius:10px; }
+    button { border:1px solid #a6c8ff; border-radius:7px; background:#a6c8ff; color:#161616; padding:9px 14px; font:inherit; font-size:13px; font-weight:700; }
+    .quiet { background:#fff; border-color:#c6c6c6; }
+    .status { padding:7px 10px; border-radius:99px; background:#defbe6; font-size:12px; }
+    .error { background:#fff1f1; }
+    @media(max-width:640px) { .swatches { grid-template-columns:1fr; } }
+  </style>
+</head>
+<body><main class="wrap">
+  <div class="eyebrow">VISUAL DIRECTION · SELECTED</div>
+  <h1>Carbon 浅色阶</h1>
+  <p>彩色强调只用 10、20、30 色阶；大面积保持白色和 Gray 10。文字保留高对比的中性深灰。</p>
+  <div class="links"><a href="./ux-bills-v2.html">查看账单页</a><a href="./ux-preview.html">查看其他四页</a></div>
+  <section class="group"><h2>主色 · Blue</h2><div class="swatches">
+    <div class="swatch"><div class="color" style="background:#edf5ff"></div><div class="label"><strong>Blue 10</strong><span>#EDF5FF</span></div></div>
+    <div class="swatch"><div class="color" style="background:#d0e2ff"></div><div class="label"><strong>Blue 20</strong><span>#D0E2FF</span></div></div>
+    <div class="swatch"><div class="color" style="background:#a6c8ff"></div><div class="label"><strong>Blue 30</strong><span>#A6C8FF</span></div></div>
+  </div></section>
+  <section class="group"><h2>页面与状态</h2><div class="swatches">
+    <div class="swatch"><div class="color" style="background:#f4f4f4"></div><div class="label"><strong>Gray 10</strong><span>#F4F4F4</span></div></div>
+    <div class="swatch"><div class="color" style="background:#defbe6"></div><div class="label"><strong>Green 10</strong><span>#DEFBE6</span></div></div>
+    <div class="swatch"><div class="color" style="background:#fff1f1"></div><div class="label"><strong>Red 10</strong><span>#FFF1F1</span></div></div>
+  </div></section>
+  <section class="group"><h2>组件示例</h2><div class="sample"><button>上传账单</button><button class="quiet">查看归档</button><span class="status">已分类</span><span class="status error">解析失败</span></div></section>
+  <p>色值来自 <a href="https://www.ibm.com/design/language/color/">IBM Design Language 官方色板</a>。文字使用深色中性灰保证可读性。</p>
+</main></body>
+</html>

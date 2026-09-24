@@ -47,6 +47,9 @@ export interface MonthlyOverview {
   bill_income: string
   declared_income: string
   asset_total: string
+  liability_total: string
+  net_assets: string
+  assets_complete: boolean
   net_worth_change: string
 }
 

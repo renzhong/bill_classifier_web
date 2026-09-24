@@ -1,8 +1,11 @@
-"""上传账单后台处理：解析 CSV → 落 bills → 跑 Pipeline → 回写分类结果"""
+"""上传账单后台处理：仅解析并保存临时账单，等待显式分类与归档。"""
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 from datetime import UTC, datetime
+from decimal import Decimal
 
 from sqlalchemy import insert, select, update
 from sqlalchemy.exc import DataError, IntegrityError
@@ -19,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 async def process_upload(task_id: int, file_bytes: bytes) -> None:
-    """异步解析 + 落库 + 跑 Pipeline。每个阶段失败都把 upload_task 标对应状态。"""
+    """异步解析并落临时账单；分类只能由用户显式触发。"""
     async with SessionLocal() as session:
         task = await session.scalar(select(UploadTask).where(UploadTask.id == task_id))
         if not task:
@@ -49,16 +52,9 @@ async def process_upload(task_id: int, file_bytes: bytes) -> None:
                 await _insert_bills(session, task, result.items)
             await session.commit()
 
-            # 跑分类 pipeline（用户没配置 step 时 run_pipeline 直接返回）
-            classified = 0
-            if inserted_bills:
-                task.status = "classifying"
-                await session.commit()
-                classified = await _classify_and_save(session, task.user_id, inserted_bills)
-
             task.total_rows = len(result.items)
-            task.classified_rows = classified
-            task.status = "done"
+            task.classified_rows = 0
+            task.status = "parsed"
             notes = []
             if result.skipped_rows:
                 notes.append(f"skipped {result.skipped_rows} bad rows")
@@ -69,11 +65,14 @@ async def process_upload(task_id: int, file_bytes: bytes) -> None:
             if result.errors:
                 notes.append(f"errors: {len(result.errors)} (first: {result.errors[0][:120]})")
             task.error_msg = "; ".join(notes)[:1024] if notes else None
+            task.parse_errors = list(result.errors)
+            if first_data_err:
+                task.parse_errors.append(f"database row error: {first_data_err}")
             task.finished_at = datetime.now(UTC).replace(tzinfo=None)
             await session.commit()
             logger.info(
-                "upload_task %s done: inserted=%d classified=%d dup=%d data_err=%d",
-                task_id, len(inserted_bills), classified, skipped_duplicate, skipped_data,
+                "upload_task %s parsed: inserted=%d dup=%d data_err=%d",
+                task_id, len(inserted_bills), skipped_duplicate, skipped_data,
             )
         except Exception as e:  # 兜底：任何未预期错误都把 task 标 failed，避免悬挂在 parsing
             logger.exception("post-parse failure for task %s", task_id)
@@ -93,18 +92,43 @@ async def _insert_bills(session, task: UploadTask, items: list) -> tuple[list[Bi
             select(Tag.id).where(Tag.user_id == task.user_id, Tag.id.in_(tag_ids))
         ))
     for item in items:
+        dedup_hash = None
+        if item.order_id is None:
+            parts = [item.bill_time.isoformat(), item.payee, item.item_name,
+                     format(item.amount.quantize(Decimal("0.01")), "f"),
+                     item.bill_type, item.owner]
+            dedup_hash = hashlib.sha256(json.dumps(parts, ensure_ascii=False).encode()).hexdigest()
+        # MySQL UNIQUE permits multiple NULL order IDs. Use exact parsed fields for
+        # those records so re-uploading the same file does not inflate reports.
+        if item.order_id is None:
+            existing = await session.scalar(select(Bill.id).where(
+                Bill.user_id == task.user_id,
+                Bill.source == item.source,
+                Bill.order_id.is_(None),
+                Bill.bill_time == item.bill_time,
+                Bill.payee == item.payee,
+                Bill.item_name == item.item_name,
+                Bill.amount == item.amount,
+                Bill.bill_type == item.bill_type,
+                Bill.owner == item.owner,
+            ).limit(1))
+            if existing is not None:
+                skipped_duplicate += 1
+                continue
         bill = Bill(
             user_id=task.user_id,
             upload_task_id=task.id,
             source=item.source,
             owner=item.owner,
             order_id=item.order_id,
+            dedup_hash=dedup_hash,
             payee=item.payee,
             item_name=item.item_name,
             amount=item.amount,
             bill_type=item.bill_type,
             bill_time=item.bill_time,
             lifecycle="unprocessed",
+            archived=False,
         )
         try:
             async with session.begin_nested():

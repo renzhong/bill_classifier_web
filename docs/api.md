@@ -55,29 +55,43 @@
 ### bills / upload-tasks
 | Method | Path | 说明 |
 |---|---|---|
-| POST | /bills/upload | multipart：CSV/XLSX file + source + owner_label + tag_ids；每笔新账单继承标签 |
-| GET | /bills | filter: month/source/category_id/tag_id/keyword/lifecycle/page |
-| GET PATCH | /bills/{id} | 详情 / 手工改类（manual_overridden）/ 修改账单标签 |
+| POST | /bills/upload | multipart：CSV/XLSX file + source + owner_label + tag_ids；每笔新账单继承标签，仅解析为临时账单 |
+| GET | /bills | 仅归档账单；filter: month/source/category_id/unclassified/tag_id/keyword/lifecycle/report_expense/page；`report_expense=true` 仅返回计入分类汇总的支出 |
+| GET PATCH | /bills/{id} | 详情 / 手工改类（`category_id` 可显式为 null）；来源平台和上传标签不可修改 |
 | POST | /bills/{id}/reclassify | 单条重跑 Pipeline |
-| POST | /bills/batch | set_category / add_tag / remove_tag / delete |
-| GET | /upload-tasks[/{id}] | 上传任务列表 / 详情 |
+| POST | /bills/batch | 兼容旧接口的 set_category / delete；add_tag / remove_tag 返回 400 |
+| GET | /upload-tasks[/{id}] | 上传任务列表 / 详情，含逐行 `parse_errors` |
+| GET | /upload-tasks/{id}/bills | 查询本批次临时或归档账单，分页 |
+| POST | /upload-tasks/{id}/classify | 仅运行固定名称正则测试规则“地铁\|公交 → 交通”，跳过人工改类 |
+| POST | /upload-tasks/{id}/archive | 原子归档整个批次，可重复调用 |
 
-### assets / incomes
+上传任务状态为 `pending → parsing → parsed → classified → archived`，解析异常为 `failed`。
+用户可以在 `parsed` 或 `classified` 状态归档。只有 `archived` 账单进入报表。
+
+### assets / investments / incomes
 | Method | Path | 说明 |
 |---|---|---|
-| GET POST | /assets | 资产快照 CRUD（?month=YYYY-MM 过滤） |
-| PATCH DELETE | /assets/{id} | 修改 / 删除 |
-| POST | /assets/copy | 从某月复制资产快照到目标月（overwrite 可选） |
-| GET POST | /incomes | 月度收入 CRUD（?year= / ?month= 过滤） |
-| PATCH DELETE | /incomes/{id} | 修改 / 删除 |
+| GET POST | /asset-items | 可复用的命名资产项、负债项 |
+| PATCH | /asset-items/{id} | 改名或停用，历史月金额不丢失 |
+| GET | /asset-months/{month} | 本月各项金额（未填为 null）、投资估值、资产/负债/净资产及完整状态 |
+| PUT | /asset-items/{id}/months/{month} | 填写本月金额，0 与未填写不同 |
+| GET POST | /investments | 投资项及初始本金；可选 `linked_asset_item_id` 关联已有资产项防重复计入 |
+| PATCH | /investments/{id} | 改名、改本金、修改关联资产项或停用 |
+| GET | /investments/months/{month} | 月买卖、现值和盈亏；缺估值时盈亏为 null |
+| PUT | /investments/{id}/months/{month} | 填写本月买卖与月末现值 |
+| GET POST | /income-entries | 逐笔收入，可按 month/year 查询，同月同来源允许多笔 |
+| PATCH DELETE | /income-entries/{id} | 编辑 / 删除逐笔收入 |
+| GET | /income-summary?year=&month= | 月收入、年收入及该月旧月度记录 |
+| GET | /assets | 只读查看旧月度资产快照；已迁入可复用项目，后续填写使用 `/asset-items` |
+| GET POST PATCH DELETE | /incomes 旧接口 | 兼容旧月度收入记录；与逐笔收入一起汇总，但不伪造具体日期 |
 
 ### reports
 | Method | Path | 说明 |
 |---|---|---|
 | GET | /reports/yearly?year=2026 | 每月账单 income / expense / balance（收支差额）+ 年度合计，不含另行录入的收入 |
-| GET | /reports/monthly?month=2026-05 | 账单支出、账单收入、录入收入、资产合计、资产较上月变化 |
+| GET | /reports/monthly?month=2026-05 | 已归档账单收支、录入收入、资产、负债、净资产与净资产较上月变化 |
 | GET | /reports/category-summary?month=2026-05 | 按类别支出汇总 + 占比 |
-| GET | /reports/balance?month=2026-05 | 资产按 asset_type 汇总 |
+| GET | /reports/balance?month=2026-05 | 手工资产与投资估值按来源类型汇总，不包含负债 |
 
 ## 错误码
 

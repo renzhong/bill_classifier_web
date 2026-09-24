@@ -1,41 +1,21 @@
-# PRD 03 · 策略类型与 Pipeline
+# PRD 03 · 分类触发与测试规则
 
-## 用户故事
-- 浏览系统内置的全部策略类型，了解每种的作用
-- 把策略类型实例化（填参数）加入我的 Pipeline，用上下按钮调整顺序
-- 启停某条步骤、改参数后可在账单明细中逐笔重分类
-- 看每条账单是被哪条策略命中的
+## 本轮范围
 
-## 内置策略类型
+- 上传账单后先解析为临时表格，不自动运行分类。
+- 用户点击“开始分类”后，才对临时账单执行分类。
+- 为验证这段流程，默认提供一条名称正则匹配测试规则：“地铁|公交”命中后归入“交通”。
+- 测试规则在账单页以只读说明展示；账单行显示命中的分类规则。
+- 用户可在“类别”下拉框中修正结果。再次分类时不覆盖人工结果，人工已分类账单不进入 AI 处理。
 
-**MVP 仅内置 1 种：`ai_classify`**（调 LLM 分类，规则文本来自用户的 AI 策略）。其他策略类型按需后续单独迭代，不预先实现。完整说明 → [docs/strategy-types.md](../docs/strategy-types.md)。
+## 暂缓范围
 
-引擎本身（StrategyType ABC + 注册器 + Pipeline runner）已具备扩展接口；新增策略类型需实现并注册后端策略，同时核对前端参数表单是否支持所需字段类型。
+规则管理页、规则增删改、名称或商户的完全匹配与更多正则规则、复杂规则类型、顺序设置和测试匹配工具，本轮均不开发，也不做交互设计。后续结合真实分类用例另行定义。
 
-## 页面
-- `/settings/pipeline`：
-  - 左侧：策略类型卡片（type_key + display_name + description + "添加"按钮）
-  - 右侧：当前 Pipeline 步骤列表（上下按钮排序、启停 switch、点击编辑参数、删除）
-  - 参数表单按 `param_schema`（JSONSchema）渲染已支持的字段类型
-
-## API
-- `GET /api/v1/pipeline/strategy-types` → `[{type_key, display_name, description, param_schema}]`
-- `GET /api/v1/pipeline/steps`
-- `POST /api/v1/pipeline/steps`
-- `PATCH /api/v1/pipeline/steps/:id`
-- `DELETE /api/v1/pipeline/steps/:id`
-- `POST /api/v1/pipeline/steps/reorder` body `{order: [{id, sort_order}]}`
-
-## 数据模型
-- `pipeline_steps(id, user_id, strategy_type, display_name, params JSON, sort_order, enabled, ts)`
+测试规则用于验证手动触发和行内修正流程，不代表需要预置通用的生产分类规则。当前代码仅实现 AI 分类策略类型；现状以代码和 docs 为准。
 
 ## 验收
-- 同一策略类型可实例化多次
-- 调换顺序后重分类，结果按新顺序生效
-- 禁用某步骤后，该步骤不参与执行
-- 参数不合法被 `validate_params()` 拒绝
-- `ai_classify` 步骤可指定不同 strategy_id，组合不同凭据 / prompt 文本
 
-## 不做
-- 步骤分组 / 子流程
-- 条件分支
+- 解析完成前、以及解析后未点击“开始分类”时，测试规则都不执行。
+- 点击后，名称包含“地铁”或“公交”的合成账单归入“交通”，其他账单不因该规则改类。
+- 表格显示命中规则；用户手动改类别后再次执行分类，人工结果保持。

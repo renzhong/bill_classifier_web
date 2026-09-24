@@ -27,7 +27,7 @@
 │   ├─ parsers (alipay, wechat)                               │
 │   ├─ classify engine + strategy_types (插件式)               │
 │   ├─ ai providers (openai_compat / claude / gemini)         │
-│   ├─ bills / reports / assets / incomes                     │
+│   ├─ bills / reports / assets / investments / incomes       │
 │   └─ tasks (FastAPI BackgroundTasks)                        │
 └────────────────────┬────────────────────────────────────────┘
                      │ async SQLAlchemy
@@ -36,6 +36,8 @@
 │   users / invitation_codes / categories / tags / user_dicts │
 │   pipeline_steps / upload_tasks / bills / bill_tags         │
 │   ai_credentials / ai_strategies / monthly_incomes / assets │
+│   asset_items / asset_month_values / investment_items       │
+│   investment_months / income_entries                        │
 └─────────────────────────────────────────────────────────────┘
                      │ HTTPS
 ┌────────────────────▼────────────────────────────────────────┐
@@ -81,10 +83,12 @@ backend/app/
 │   ├── providers/openai_compat.py | claude.py | gemini.py
 │   ├── prompt_template.py
 │   └── service.py     业务封装
-├── tasks/        BackgroundTasks runner
-├── bills/        列表/明细/手动改类/批量/重分类
+├── tasks/        BackgroundTasks 账单解析 runner
+├── bills/        临时批次/手动测试分类/归档/明细与改类
 ├── reports/      yearly / monthly / category-summary / balance
-├── assets/  incomes/
+├── assets/       资产项/负债项与每月金额
+├── investments/  投资项/每月买卖、估值与盈亏
+├── incomes/      逐笔收入与旧月度收入
 └── api/v1/       router 聚合
 ```
 
@@ -101,14 +105,20 @@ users ─┬─< invitation_codes
        ├─< pipeline_steps >─< bills.classify_strategy_id
        ├─< upload_tasks ─< bills
        ├─< ai_credentials ─< ai_strategies
-       ├─< monthly_incomes
-       └─< assets
+       ├─< monthly_incomes, income_entries
+       ├─< assets (旧快照)
+       ├─< asset_items ─< asset_month_values
+       └─< investment_items ─< investment_months
 ```
 
 完整字段定义见 `migrations/versions/0001_initial_schema.py`，关键设计：
 
 - `bills.bill_month`：MySQL 生成列 `DATE_FORMAT(bill_time, '%Y-%m')`，月度报表零成本聚合
 - `bills` UNIQUE `(user_id, source, order_id)`：上传幂等
+- 无交易单号的账单另存 `dedup_hash` 唯一摘要；旧账单按解析字段查重
+- `bills.archived` 与分类 `lifecycle` 独立：新上传先临时保存，旧数据迁移为已归档；只有已归档账单进入报表
+- `asset_month_values` 缺行表示待填写，金额 0 表示明确录入 0；投资估值仅从 `investment_months` 投影。投资项可关联已有手工资产项，关联后该手工项在投资月份不再计入合计，避免重复计入
+- 旧 `assets` 保留并迁入可复用资产项，旧 `monthly_incomes` 保留月度粒度，不伪造收入日期
 - `pipeline_steps.params` JSON：策略类型自定义参数，由 StrategyType 校验
 - 所有用户级表 `user_id` 列建索引
 
@@ -135,14 +145,16 @@ class StrategyType(ABC):
 
 ```
 upload CSV/XLSX → parsers → list[BillItem]
-           → 插入并提交新 bills（含上传标签）
-           → engine.run(新账单, user_pipeline_steps, ctx)
-                 for step in steps (按 sort_order):
-                     if step.enabled:
-                         strategy = REGISTRY[step.strategy_type]
-                         items = await strategy.run(items, step.params, ctx)
-           → 回写分类结果（含 classify_strategy_id / classify_strategy_type）
+           → 保存临时 bills（含不可逐笔修改的上传标签）
+           → 用户点击“开始分类”：仅对非人工改类的临时支出账单运行
+              名称正则“地铁|公交 → 交通”测试规则
+           → 用户在临时表格直接修正类别 → 点击归档
+           → 归档账单按交易时间进入月份查询和报表
 ```
+
+用户配置的 Pipeline 和 AI 组件仍保留，但当前上传流程不会自动调用。单条
+`/bills/{id}/reclassify` 仍可显式运行现有 Pipeline，且人工改类账单不会交给 AI。
+本轮没有规则管理页，也未把测试正则注册为通用策略类型。
 
 **为何 param_schema 是 JSONSchema**：前端据此渲染当前支持的参数类型；新字段类型需扩展表单组件。
 

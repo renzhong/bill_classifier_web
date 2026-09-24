@@ -1,13 +1,14 @@
 from __future__ import annotations
 
+import re
 from collections.abc import Sequence
 
 from fastapi import HTTPException, status
-from sqlalchemy import and_, delete, func, or_, select
+from sqlalchemy import and_, delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.bill import Bill, BillTag, UploadTask
-from app.models.category import Tag
+from app.models.category import Category, Tag
 from app.schemas.bill import BatchActionIn
 
 
@@ -73,21 +74,32 @@ async def list_bills(
     month: str | None = None,
     source: str | None = None,
     category_id: int | None = None,
+    unclassified: bool = False,
     tag_id: int | None = None,
     keyword: str | None = None,
     lifecycle: str | None = None,
+    report_expense: bool = False,
+    task_id: int | None = None,
     page: int = 1,
     page_size: int = 50,
 ) -> tuple[list[Bill], int]:
     conds = [Bill.user_id == user_id]
+    if task_id is None:
+        conds.append(Bill.archived.is_(True))
+    else:
+        conds.append(Bill.upload_task_id == task_id)
     if month:
         conds.append(Bill.bill_month == month)
     if source:
         conds.append(Bill.source == source)
     if category_id is not None:
         conds.append(Bill.category_id == category_id)
+    elif unclassified:
+        conds.append(Bill.category_id.is_(None))
     if lifecycle:
         conds.append(Bill.lifecycle == lifecycle)
+    if report_expense:
+        conds.extend((Bill.bill_type == "expense", Bill.lifecycle.notin_(("skipped", "cross_month_refund"))))
     if keyword:
         like = f"%{keyword}%"
         conds.append(or_(Bill.payee.like(like), Bill.item_name.like(like)))
@@ -136,21 +148,22 @@ async def load_tag_map(session: AsyncSession, bill_ids: list[int]) -> dict[int, 
 
 
 async def patch_bill(
-    session: AsyncSession, user_id: int, bill_id: int, *, category_id: int | None, tag_ids: list[int] | None
+    session: AsyncSession, user_id: int, bill_id: int, *, category_id: int | None,
+    category_sent: bool, tag_ids: list[int] | None
 ) -> Bill:
     bill = await session.scalar(select(Bill).where(Bill.id == bill_id, Bill.user_id == user_id))
     if not bill:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "bill not found")
-    if category_id is not None:
+    if tag_ids is not None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "upload tags cannot be changed")
+    if category_sent:
+        if category_id is not None:
+            await _validate_category_id(session, user_id, category_id)
         bill.category_id = category_id
         bill.manual_overridden = True
-        if bill.lifecycle == "unprocessed":
-            bill.lifecycle = "classified"
-    if tag_ids is not None:
-        await _validate_tag_ids(session, user_id, tag_ids)
-        await session.execute(delete(BillTag).where(BillTag.bill_id == bill.id))
-        for tid in set(tag_ids):
-            session.add(BillTag(bill_id=bill.id, tag_id=tid))
+        bill.classify_strategy_id = None
+        bill.classify_strategy_type = "manual"
+        bill.lifecycle = "classified" if category_id is not None else "unprocessed"
     await session.commit()
     await session.refresh(bill)
     return bill
@@ -171,6 +184,7 @@ async def batch_action(session: AsyncSession, user_id: int, body: BatchActionIn)
         cat = body.payload.get("category_id")
         if cat is None:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "category_id required")
+        await _validate_category_id(session, user_id, int(cat))
         for bid in owned:
             b = await session.scalar(select(Bill).where(Bill.id == bid))
             if b:
@@ -179,23 +193,9 @@ async def batch_action(session: AsyncSession, user_id: int, body: BatchActionIn)
                 if b.lifecycle == "unprocessed":
                     b.lifecycle = "classified"
     elif body.action == "add_tag":
-        tid = body.payload.get("tag_id")
-        if tid is None:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "tag_id required")
-        await _validate_tag_ids(session, user_id, [tid])
-        for bid in owned:
-            exists = await session.scalar(
-                select(BillTag).where(BillTag.bill_id == bid, BillTag.tag_id == tid)
-            )
-            if not exists:
-                session.add(BillTag(bill_id=bid, tag_id=tid))
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "upload tags cannot be changed")
     elif body.action == "remove_tag":
-        tid = body.payload.get("tag_id")
-        if tid is None:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "tag_id required")
-        await session.execute(
-            delete(BillTag).where(BillTag.bill_id.in_(owned), BillTag.tag_id == tid)
-        )
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "upload tags cannot be changed")
 
     await session.commit()
     return {"affected": len(owned)}
@@ -209,3 +209,66 @@ async def _validate_tag_ids(session: AsyncSession, user_id: int, tag_ids: list[i
     ))
     if owned_ids != set(tag_ids):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "some tags not found")
+
+
+async def _validate_category_id(session: AsyncSession, user_id: int, category_id: int) -> None:
+    found = await session.scalar(
+        select(Category.id).where(Category.id == category_id, Category.user_id == user_id)
+    )
+    if found is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "category not found")
+
+
+async def classify_upload_task(session: AsyncSession, user_id: int, task_id: int) -> UploadTask:
+    task = await session.scalar(
+        select(UploadTask).where(UploadTask.id == task_id, UploadTask.user_id == user_id).with_for_update()
+    )
+    if not task:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "task not found")
+    if task.status not in ("parsed", "classified"):
+        raise HTTPException(status.HTTP_409_CONFLICT, "task is not ready for classification")
+    bills = list(await session.scalars(
+        select(Bill).where(Bill.upload_task_id == task_id, Bill.user_id == user_id, Bill.archived.is_(False))
+    ))
+    matches = [b for b in bills if not b.manual_overridden and b.bill_type == "expense"
+               and re.search(r"地铁|公交", b.item_name or "")]
+    category = None
+    if matches:
+        category = await session.scalar(
+            select(Category).where(Category.user_id == user_id, Category.name == "交通")
+        )
+        if category is None:
+            category = Category(user_id=user_id, name="交通", display_name="交通")
+            session.add(category)
+            await session.flush()
+    for bill in matches:
+        bill.category_id = category.id if category else None
+        bill.classify_strategy_id = None
+        bill.classify_strategy_type = "name_regex"
+        bill.lifecycle = "classified"
+    task.classified_rows = sum(1 for b in bills if b.category_id is not None)
+    task.status = "classified"
+    await session.commit()
+    await session.refresh(task)
+    return task
+
+
+async def archive_upload_task(session: AsyncSession, user_id: int, task_id: int) -> UploadTask:
+    task = await session.scalar(
+        select(UploadTask).where(UploadTask.id == task_id, UploadTask.user_id == user_id).with_for_update()
+    )
+    if not task:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "task not found")
+    if task.status == "archived":
+        return task
+    if task.status not in ("parsed", "classified"):
+        raise HTTPException(status.HTTP_409_CONFLICT, "task is not ready for archive")
+    await session.execute(
+        update(Bill)
+        .where(Bill.upload_task_id == task_id, Bill.user_id == user_id)
+        .values(archived=True)
+    )
+    task.status = "archived"
+    await session.commit()
+    await session.refresh(task)
+    return task

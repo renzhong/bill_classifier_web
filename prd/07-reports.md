@@ -7,6 +7,7 @@
 - 看某月资产结构与资产合计（基于该月录入的资产快照）
 
 ## 页面
+- 每月账单分类汇总是目标页面结构中的账单花费入口；资产录入与资产汇总统一在 [PRD 08](./08-assets-and-incomes.md) 的每月资产汇总页完成，不另设资产汇总页。
 - `/reports/yearly`：year 选择 + ECharts 柱状（每月 income vs expense）+ 年度合计卡
 - `/reports/monthly`：month 选择 + 卡片网格（账单支出/账单收入/已录入收入/资产合计/资产较上月变化）
 - `/reports/category`：month 选择 + 饼图 + 表格（点击类别跳明细页过滤）
