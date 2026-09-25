@@ -35,7 +35,9 @@ async def delete_tag(tag_id: int, user: CurrentUser, session: SessionDep) -> dic
     tag = await session.scalar(select(Tag).where(Tag.id == tag_id, Tag.user_id == user.id))
     if not tag:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "tag not found")
-    await session.execute(delete(BillTag).where(BillTag.tag_id == tag_id))
+    used = await session.scalar(select(BillTag.bill_id).where(BillTag.tag_id == tag_id).limit(1))
+    if used is not None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "tag is attached to bills")
     await session.execute(delete(Tag).where(Tag.id == tag_id))
     await session.commit()
     return ok({"deleted": tag_id})

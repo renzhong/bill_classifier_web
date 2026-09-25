@@ -11,14 +11,17 @@ os.environ.setdefault("BCW_FERNET_KEY", "wfd6JLrx2VLDuJfm5RncRzCKqM8M9aFpaSGv4UC
 
 @pytest.fixture
 async def upload_db(monkeypatch):
-    from sqlalchemy import delete
+    from sqlalchemy import delete, select
     from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
     from sqlalchemy.pool import NullPool
 
     from app.core.config import get_settings
     from app.models.ai import AiCredential, AiStrategy
+    from app.models.asset import AssetItem, AssetMonthValue
     from app.models.bill import Bill, UploadTask
     from app.models.category import Category, Tag
+    from app.models.income import IncomeEntry, MonthlyIncome
+    from app.models.investment import InvestmentItem, InvestmentMonth
     from app.models.invitation import InvitationCode
     from app.models.pipeline import PipelineStep
     from app.models.user import User
@@ -44,6 +47,12 @@ async def upload_db(monkeypatch):
     finally:
         async with sessions() as session:
             await session.execute(delete(InvitationCode).where(InvitationCode.created_by == user_id))
+            asset_ids = select(AssetItem.id).where(AssetItem.user_id == user_id)
+            investment_ids = select(InvestmentItem.id).where(InvestmentItem.user_id == user_id)
+            await session.execute(delete(AssetMonthValue).where(AssetMonthValue.item_id.in_(asset_ids)))
+            await session.execute(delete(InvestmentMonth).where(InvestmentMonth.item_id.in_(investment_ids)))
+            for model in (InvestmentItem, AssetItem, IncomeEntry, MonthlyIncome):
+                await session.execute(delete(model).where(model.user_id == user_id))
             for model in (Bill, UploadTask, PipelineStep, AiStrategy, AiCredential, Category, Tag):
                 await session.execute(delete(model).where(model.user_id == user_id))
             await session.execute(delete(User).where(User.id == user_id))

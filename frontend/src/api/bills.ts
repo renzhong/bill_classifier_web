@@ -19,6 +19,7 @@ export interface Bill {
   ai_provider: string | null
   ai_confidence: string | null
   manual_overridden: boolean
+  archived: boolean
   tag_ids: number[]
 }
 
@@ -33,9 +34,11 @@ export interface BillListQuery {
   month?: string
   source?: string
   category_id?: number
+  unclassified?: boolean
   tag_id?: number
   keyword?: string
   lifecycle?: string
+  report_expense?: boolean
   page?: number
   page_size?: number
 }
@@ -49,6 +52,7 @@ export interface UploadTask {
   total_rows: number
   classified_rows: number
   error_msg: string | null
+  parse_errors: string[]
   tag_ids: number[]
   owner_label: string | null
   created_at: string
@@ -61,7 +65,7 @@ export const billApi = {
   }),
   list: (q: BillListQuery = {}) => request.get<unknown, BillListResult>('/bills', { params: q }),
   get: (id: number) => request.get<unknown, Bill>(`/bills/${id}`),
-  patch: (id: number, body: { category_id?: number | null; tag_ids?: number[] }) =>
+  patch: (id: number, body: { category_id: number | null }) =>
     request.patch<unknown, Bill>(`/bills/${id}`, body),
   reclassify: (id: number) =>
     request.post<unknown, { queued: boolean; note?: string }>(`/bills/${id}/reclassify`),
@@ -72,4 +76,8 @@ export const billApi = {
 export const uploadTaskApi = {
   list: () => request.get<unknown, UploadTask[]>('/upload-tasks'),
   get: (id: number) => request.get<unknown, UploadTask>(`/upload-tasks/${id}`),
+  bills: (id: number, page = 1, page_size = 50) =>
+    request.get<unknown, BillListResult>(`/upload-tasks/${id}/bills`, { params: { page, page_size } }),
+  classify: (id: number) => request.post<unknown, UploadTask>(`/upload-tasks/${id}/classify`),
+  archive: (id: number) => request.post<unknown, UploadTask>(`/upload-tasks/${id}/archive`),
 }

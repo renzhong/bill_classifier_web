@@ -50,4 +50,7 @@ class MonthlyOverviewOut(BaseModel):
     bill_income: Decimal
     declared_income: Decimal       # 来自 monthly_incomes
     asset_total: Decimal
-    net_worth_change: Decimal      # asset_total - prev_month asset_total
+    liability_total: Decimal
+    net_assets: Decimal
+    assets_complete: bool
+    net_worth_change: Decimal      # current net_assets - previous net_assets

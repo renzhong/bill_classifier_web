@@ -23,6 +23,7 @@ watch(monthTs, load)
 onMounted(load)
 
 const chartOption = computed(() => ({
+  color: ['#a6c8ff', '#9ef0f0', '#d4bbff', '#ffb3b8', '#ffdfad', '#c6c6c6'],
   tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
   legend: { type: 'scroll', orient: 'vertical', left: 10, top: 10, bottom: 10 },
   series: [
@@ -39,7 +40,9 @@ const chartOption = computed(() => ({
 
 function jumpDetail(row: CategoryBucket) {
   if (!data.value) return
-  router.push({ path: '/bills/detail', query: { month: data.value.year_month, category_id: row.category_id ?? '' } })
+  router.push({ path: '/bills', query: { month: data.value.year_month,
+    report_expense: '1',
+    ...(row.category_id === null ? { unclassified: '1' } : { category_id: row.category_id }) } })
 }
 
 const columns = computed<DataTableColumns<CategoryBucket>>(() => [

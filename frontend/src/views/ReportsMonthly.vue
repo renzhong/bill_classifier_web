@@ -25,6 +25,7 @@ onMounted(load)
 
 const typeLabel: Record<string, string> = {
   cash: '现金', deposit: '存款', stock: '股票', fund: '基金', other: '其他',
+  manual: '自定义资产', investment: '投资估值',
 }
 const balanceColumns: DataTableColumns<{ asset_type: string; amount: string; count: number }> = [
   { title: '资产类型', key: 'asset_type', render: (r) => typeLabel[r.asset_type] || r.asset_type },
@@ -44,7 +45,7 @@ const balanceColumns: DataTableColumns<{ asset_type: string; amount: string; cou
         <n-gi><n-statistic label="账单收入" :value="overview.bill_income" /></n-gi>
         <n-gi><n-statistic label="已录入收入合计" :value="overview.declared_income" /></n-gi>
         <n-gi><n-statistic label="资产合计" :value="overview.asset_total" /></n-gi>
-        <n-gi><n-statistic label="资产较上月变化" :value="overview.net_worth_change" /></n-gi>
+        <n-gi><n-statistic label="净资产" :value="overview.net_assets" /></n-gi>
       </n-grid>
     </n-card>
 

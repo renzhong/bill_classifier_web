@@ -1,6 +1,6 @@
 # Bill Classifier Web
 
-通用账单分类 Web 系统。上传支付宝 / 微信账单 CSV 或 XLSX，按用户在 Web 上编排的「策略 Pipeline」自动归类到用户自定义的业务分类，并提供报表、资产与收入管理页面。
+个人财务 Web 系统。上传支付宝 / 微信账单 CSV 或 XLSX 后，先核对临时表格，手动触发测试分类规则并修正类别，再归档按月查看。提供分类花费、可复用资产项与负债项、投资和逐笔收入页面。原有 AI Pipeline 配置保留，但上传时不自动运行。
 
 **通用配置驱动**：系统提供 `StrategyType` 扩展骨架（ABC + 注册器 + Pipeline runner）；**当前迭代仅内置 `ai_classify` 一种策略**——把用户填写的多条文本规则注入 prompt template，逐条账单调 LLM 分类。支持 6 个 LLM provider（openai / qwen / glm / kimi / claude / gemini）。其他策略类型（精确匹配 / 合并 / 时间窗扩散等）按需后续单独迭代；新增类型需注册后端策略，并检查前端参数表单的支持情况。
 

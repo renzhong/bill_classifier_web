@@ -6,7 +6,9 @@ from typing import Annotated
 from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, Query, UploadFile, status
 
 from app.bills.service import (
+    archive_upload_task,
     batch_action,
+    classify_upload_task,
     create_upload_task,
     get_bill_with_tags,
     get_upload_task,
@@ -72,6 +74,34 @@ async def get_task_endpoint(task_id: int, user: CurrentUser, session: SessionDep
     return ok(UploadTaskOut.model_validate(task).model_dump(mode="json"))
 
 
+@router.get("/upload-tasks/{task_id}/bills")
+async def get_task_bills_endpoint(
+    task_id: int, user: CurrentUser, session: SessionDep,
+    page: int = Query(default=1, ge=1), page_size: int = Query(default=50, ge=1, le=500),
+) -> dict:
+    await get_upload_task(session, user.id, task_id)
+    rows, total = await list_bills(session, user.id, task_id=task_id, page=page, page_size=page_size)
+    tag_map = await load_tag_map(session, [r.id for r in rows])
+    items = []
+    for bill in rows:
+        item = BillOut.model_validate(bill).model_dump(mode="json")
+        item["tag_ids"] = tag_map.get(bill.id, [])
+        items.append(item)
+    return ok(BillListOut(items=items, total=total, page=page, page_size=page_size).model_dump(mode="json"))
+
+
+@router.post("/upload-tasks/{task_id}/classify")
+async def classify_task_endpoint(task_id: int, user: CurrentUser, session: SessionDep) -> dict:
+    task = await classify_upload_task(session, user.id, task_id)
+    return ok(UploadTaskOut.model_validate(task).model_dump(mode="json"))
+
+
+@router.post("/upload-tasks/{task_id}/archive")
+async def archive_task_endpoint(task_id: int, user: CurrentUser, session: SessionDep) -> dict:
+    task = await archive_upload_task(session, user.id, task_id)
+    return ok(UploadTaskOut.model_validate(task).model_dump(mode="json"))
+
+
 @router.get("/bills")
 async def list_bills_endpoint(
     user: CurrentUser,
@@ -79,9 +109,11 @@ async def list_bills_endpoint(
     month: str | None = Query(default=None),
     source: str | None = Query(default=None),
     category_id: int | None = Query(default=None),
+    unclassified: bool = Query(default=False),
     tag_id: int | None = Query(default=None),
     keyword: str | None = Query(default=None),
     lifecycle: str | None = Query(default=None),
+    report_expense: bool = Query(default=False),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50, ge=1, le=500),
 ) -> dict:
@@ -91,9 +123,11 @@ async def list_bills_endpoint(
         month=month,
         source=source,
         category_id=category_id,
+        unclassified=unclassified,
         tag_id=tag_id,
         keyword=keyword,
         lifecycle=lifecycle,
+        report_expense=report_expense,
         page=page,
         page_size=page_size,
     )
@@ -119,7 +153,8 @@ async def patch_bill_endpoint(
     bill_id: int, body: BillPatchIn, user: CurrentUser, session: SessionDep
 ) -> dict:
     bill = await patch_bill(
-        session, user.id, bill_id, category_id=body.category_id, tag_ids=body.tag_ids
+        session, user.id, bill_id, category_id=body.category_id,
+        category_sent="category_id" in body.model_fields_set, tag_ids=body.tag_ids
     )
     _, tag_ids = await get_bill_with_tags(session, user.id, bill.id)
     d = BillOut.model_validate(bill).model_dump(mode="json")

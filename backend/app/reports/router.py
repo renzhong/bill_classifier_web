@@ -1,4 +1,4 @@
-"""报表聚合端点：从 bills + monthly_incomes + assets 三个表算"""
+"""Archived bill, income, and monthly asset projections."""
 from __future__ import annotations
 
 from decimal import Decimal
@@ -7,12 +7,12 @@ from fastapi import APIRouter, Query
 from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.assets.router import asset_month_summary
 from app.core.deps import CurrentUser, SessionDep
 from app.core.response import ok
-from app.models.asset import Asset
 from app.models.bill import Bill
 from app.models.category import Category
-from app.models.income import MonthlyIncome
+from app.models.income import IncomeEntry, MonthlyIncome
 from app.schemas.report import (
     AssetBucket,
     BalanceOut,
@@ -38,7 +38,7 @@ async def _bills_sum_by_type(
     """返回 {'income': sum, 'expense': sum, 'other': sum} （已剔除 skipped）"""
     q = (
         select(Bill.bill_type, func.coalesce(func.sum(Bill.amount), 0))
-        .where(Bill.user_id == user_id, Bill.lifecycle.notin_(_SKIP_LIFECYCLE))
+        .where(Bill.user_id == user_id, Bill.archived.is_(True), Bill.lifecycle.notin_(_SKIP_LIFECYCLE))
         .group_by(Bill.bill_type)
     )
     if month:
@@ -50,15 +50,6 @@ async def _bills_sum_by_type(
     for bt, total in rows:
         out[bt] = _to_d(total)
     return out
-
-
-async def _assets_total(session: AsyncSession, user_id: int, month: str) -> Decimal:
-    total = await session.scalar(
-        select(func.coalesce(func.sum(Asset.amount), 0)).where(
-            Asset.user_id == user_id, Asset.snapshot_month == month
-        )
-    )
-    return _to_d(total)
 
 
 @router.get("/yearly")
@@ -77,6 +68,7 @@ async def yearly_report(
         )
         .where(
             Bill.user_id == user.id,
+            Bill.archived.is_(True),
             Bill.lifecycle.notin_(_SKIP_LIFECYCLE),
             Bill.bill_month.like(f"{year}-%"),
         )
@@ -116,22 +108,36 @@ async def monthly_overview(
             MonthlyIncome.user_id == user.id, MonthlyIncome.year_month == month
         )
     )
-    asset_now = await _assets_total(session, user.id, month)
+    year_num, month_num = map(int, month.split("-"))
+    from datetime import datetime
+    end = datetime(year_num + 1, 1, 1) if month_num == 12 else datetime(year_num, month_num + 1, 1)
+    entries_income = await session.scalar(
+        select(func.coalesce(func.sum(IncomeEntry.amount), 0)).where(
+            IncomeEntry.user_id == user.id,
+            IncomeEntry.occurred_at >= datetime(year_num, month_num, 1),
+            IncomeEntry.occurred_at < end,
+        )
+    )
+    current_assets = await asset_month_summary(session, user.id, month)
+    asset_now = _to_d(current_assets["asset_total"])
 
     # prev month
     year, mon = month.split("-")
     p_y, p_m = (int(year), int(mon) - 1) if int(mon) > 1 else (int(year) - 1, 12)
     prev_month = f"{p_y:04d}-{p_m:02d}"
-    asset_prev = await _assets_total(session, user.id, prev_month)
+    previous_assets = await asset_month_summary(session, user.id, prev_month)
 
     return ok(
         MonthlyOverviewOut(
             year_month=month,
             bill_expense=sums["expense"],
             bill_income=sums["income"],
-            declared_income=_to_d(declared_income),
+            declared_income=_to_d(declared_income) + _to_d(entries_income),
             asset_total=asset_now,
-            net_worth_change=asset_now - asset_prev,
+            liability_total=_to_d(current_assets["liability_total"]),
+            net_assets=_to_d(current_assets["net_assets"]),
+            assets_complete=current_assets["complete"],
+            net_worth_change=_to_d(current_assets["net_assets"]) - _to_d(previous_assets["net_assets"]),
         ).model_dump(mode="json")
     )
 
@@ -150,6 +156,7 @@ async def category_summary(
         .join(Category, Category.id == Bill.category_id, isouter=True)
         .where(
             Bill.user_id == user.id,
+            Bill.archived.is_(True),
             Bill.lifecycle.notin_(_SKIP_LIFECYCLE),
             Bill.bill_month == month,
             Bill.bill_type == "expense",
@@ -183,21 +190,21 @@ async def category_summary(
 async def balance_report(
     user: CurrentUser, session: SessionDep, month: str = Query(..., min_length=7, max_length=7)
 ) -> dict:
-    rows = await session.execute(
-        select(
-            Asset.asset_type,
-            func.coalesce(func.sum(Asset.amount), 0),
-            func.count(Asset.id),
-        )
-        .where(Asset.user_id == user.id, Asset.snapshot_month == month)
-        .group_by(Asset.asset_type)
-        .order_by(Asset.asset_type)
-    )
+    summary = await asset_month_summary(session, user.id, month)
+    grouped: dict[str, tuple[Decimal, int]] = {}
+    for item in summary["items"]:
+        if item["kind"] != "asset" or item["amount"] is None:
+            continue
+        kind = item["legacy_type"] or "manual"
+        amount, count = grouped.get(kind, (Decimal("0"), 0))
+        grouped[kind] = (amount + Decimal(item["amount"]), count + 1)
+    for item in summary["investments"]:
+        if item["closing_value"] is None:
+            continue
+        amount, count = grouped.get("investment", (Decimal("0"), 0))
+        grouped["investment"] = (amount + Decimal(item["closing_value"]), count + 1)
     buckets: list[AssetBucket] = []
-    total = Decimal("0.00")
-    for atype, amount, cnt in rows:
-        a = _to_d(amount)
-        total += a
-        buckets.append(AssetBucket(asset_type=atype, amount=a, count=int(cnt)))
+    for atype, (amount, cnt) in grouped.items():
+        buckets.append(AssetBucket(asset_type=atype, amount=_to_d(amount), count=cnt))
 
-    return ok(BalanceOut(year_month=month, asset_total=total, buckets=buckets).model_dump(mode="json"))
+    return ok(BalanceOut(year_month=month, asset_total=_to_d(summary["asset_total"]), buckets=buckets).model_dump(mode="json"))

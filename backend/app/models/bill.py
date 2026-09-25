@@ -32,6 +32,7 @@ class UploadTask(Base):
     total_rows: Mapped[int] = mapped_column(Integer, default=0)
     classified_rows: Mapped[int] = mapped_column(Integer, default=0)
     error_msg: Mapped[str | None] = mapped_column(String(1024))
+    parse_errors: Mapped[list[str]] = mapped_column(JSON, default=list)
 
     tag_ids: Mapped[list[int]] = mapped_column(JSON, default=list)
     owner_label: Mapped[str | None] = mapped_column(String(32))
@@ -44,6 +45,7 @@ class Bill(Base):
     __tablename__ = "bills"
     __table_args__ = (
         UniqueConstraint("user_id", "source", "order_id", name="uk_user_order"),
+        UniqueConstraint("user_id", "source", "dedup_hash", name="uq_bill_null_order_hash"),
         Index("idx_user_time", "user_id", "bill_time"),
         Index("idx_user_month", "user_id", "bill_month"),
         Index("idx_user_cat", "user_id", "category_id"),
@@ -56,6 +58,7 @@ class Bill(Base):
     source: Mapped[str] = mapped_column(String(16))
     owner: Mapped[str | None] = mapped_column(String(32))
     order_id: Mapped[str | None] = mapped_column(String(128))
+    dedup_hash: Mapped[str | None] = mapped_column(String(64))
     payee: Mapped[str | None] = mapped_column(String(255))
     item_name: Mapped[str | None] = mapped_column(String(512))
     amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
@@ -79,6 +82,7 @@ class Bill(Base):
     ai_provider: Mapped[str | None] = mapped_column(String(32))
     ai_confidence: Mapped[Decimal | None] = mapped_column(Numeric(3, 2))
     manual_overridden: Mapped[bool] = mapped_column(Boolean, default=False)
+    archived: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0", index=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(

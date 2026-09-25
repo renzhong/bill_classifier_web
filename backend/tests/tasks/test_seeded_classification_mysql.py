@@ -1,4 +1,4 @@
-"""The same SQL and files used for manual testing exercise the real pipeline."""
+"""Synthetic uploaded files remain staged until explicit classification and archive."""
 
 import csv
 from decimal import Decimal
@@ -11,6 +11,7 @@ from pymysql.constants import CLIENT
 from sqlalchemy import select
 
 from app.ai import service
+from app.bills.service import archive_upload_task, classify_upload_task, list_bills
 from app.core.config import get_settings
 from app.core.security import encrypt_secret
 from app.models.ai import AiCredential, AiStrategy
@@ -91,7 +92,7 @@ async def test_seeded_upload_classifies_and_deduplicates(upload_db, monkeypatch,
     await upload_runner.process_upload(task_id, content)
     async with sessions() as session:
         task = await session.get(UploadTask, task_id)
-        assert (task.status, task.total_rows, task.classified_rows) == ("done", 6, 5)
+        assert (task.status, task.total_rows, task.classified_rows) == ("parsed", 6, 0)
         actual = (
             await session.execute(
                 select(Bill, Category.name)
@@ -104,8 +105,20 @@ async def test_seeded_upload_classifies_and_deduplicates(upload_db, monkeypatch,
         for case in samples:
             bill, category = by_order[case["order_id"]]
             assert bill.amount == Decimal(case["expected_amount"])
-            assert category == case["expected_category"]
-            assert bill.lifecycle == ("classified" if category else "unprocessed")
+            assert category is None
+            assert bill.lifecycle == "unprocessed"
+            assert bill.archived is False
+        assert (await list_bills(session, user_id))[1] == 0
+        assert calls == []
+
+        task = await classify_upload_task(session, user_id, task_id)
+        assert (task.status, task.classified_rows) == ("classified", 1)
+        traffic = await session.scalar(select(Bill).where(Bill.user_id == user_id, Bill.order_id == "sample-002"))
+        await session.refresh(traffic)
+        assert traffic.category_id is not None and traffic.classify_strategy_type == "name_regex"
+        await archive_upload_task(session, user_id, task_id)
+        assert (await list_bills(session, user_id))[1] == 6
+        assert calls == []
         retry = UploadTask(user_id=user_id, source=source, filename=task.filename)
         session.add(retry)
         await session.commit()
@@ -114,6 +127,6 @@ async def test_seeded_upload_classifies_and_deduplicates(upload_db, monkeypatch,
     await upload_runner.process_upload(retry_id, content)
     async with sessions() as session:
         retry = await session.get(UploadTask, retry_id)
-        assert retry.status == "done"
+        assert retry.status == "parsed"
         assert "6 duplicates" in retry.error_msg
-        assert len(calls) == 6  # Duplicate imports must not call a model again.
+        assert calls == []
